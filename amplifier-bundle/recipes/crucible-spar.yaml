@@ -1,0 +1,313 @@
+name: "crucible-spar"
+description: "Adversarial idea sharpening — pressure-tests through escalating debate rounds without rendering judgment"
+version: "1.0.0"
+author: "Amplihack Team"
+tags: ["crucible", "spar", "adversarial", "sharpening", "pressure-test"]
+
+# CRUCIBLE_SPAR: Structured Adversarial Sharpening
+#
+# Forces a real decision boundary without making the decision for the human.
+# The workflow sharpens an idea by identifying the core tension, generating
+# genuinely opposed domain-specific roles, running isolated escalating rounds,
+# and synthesizing a forcing function: choose X or Y and accept the losses.
+#
+# WHEN TO USE:
+#   - You want an idea pressure-tested without outsourcing judgment
+#   - You need sharper trade-offs instead of balanced pros/cons mush
+#   - You want domain-specific adversaries, not generic bull/bear roles
+#   - You want a SparReport that can seed a later validation-mode debate
+#
+# WHEN NOT TO USE:
+#   - You want the system to make the final call for you
+#   - The idea is too vague for meaningful adversarial framing
+#   - You need market research more than adversarial sharpening
+#   - You need implementation planning rather than idea pressure-testing
+#
+# PHASES (5 Steps):
+#   1. Intake Parse - structure the idea and identify the core tension axis
+#   2. Role Generation - create 2-3 domain-specific adversarial roles
+#   3. Isolated Argumentation - sealed escalating rounds without cross-visibility
+#   4. Forcing-Function Synthesis - force a choice without rendering judgment
+#   5. Rubber Duck Review - detect strawmen, false dichotomies, or mush
+#
+# Usage:
+#   amplihack recipe run amplifier-bundle/recipes/crucible-spar.yaml -c idea_description="A product idea to pressure-test" -c num_rounds="3" -c repo_path="."
+
+recursion:
+  max_depth: 4
+  max_total_steps: 20
+
+context:
+  # ==========================================================================
+  # REQUIRED INPUTS
+  # ==========================================================================
+
+  # The idea to spar about
+  idea_description: ""
+
+  # ==========================================================================
+  # CONFIGURATION OPTIONS
+  # ==========================================================================
+
+  # Number of spar rounds. Default is 3:
+  #   1 = Probing only
+  #   2 = Probing + Challenging
+  #   3 = Probing + Challenging + Hostile
+  num_rounds: "3"
+
+  # Working directory for repo-aware context
+  repo_path: "."
+
+  # ==========================================================================
+  # INTERNAL STATE (populated during execution)
+  # ==========================================================================
+  intake_record: ""
+  spar_roles: ""
+  isolated_argumentation: ""
+  spar_report: ""
+  rubber_duck_review: ""
+
+steps:
+  # ==========================================================================
+  # STEP 1: INTAKE PARSE
+  # ==========================================================================
+  - id: "intake-parse"
+    agent: "amplihack:crucible-intake"
+    prompt: |
+      Structure this raw idea for Crucible Spar mode:
+
+      **Idea Description:**
+      {{idea_description}}
+
+      **Repo Path:** {{repo_path}}
+
+      Your task:
+      1. Convert the raw idea into a structured Crucible intake record.
+      2. Identify the single core tension/conflict axis that makes this idea worth sparring.
+      3. Tighten sloppy framing without inventing facts.
+      4. Surface missing information bluntly if the idea is under-specified.
+
+      Return YAML only using this shape:
+
+      ```yaml
+      idea:
+        raw_input: "<preserved verbatim>"
+        problem: "<what problem does this solve?>"
+        audience: "<who has this problem?>"
+        hypothesis: "<why would this solution work?>"
+        existing_alternatives:
+          - "<what exists today>"
+        constraints:
+          - "<non-negotiable boundaries>"
+        goal_type: commercial | internal | research
+        suggested_mode: spar
+        confidence: high | medium | low
+        reasoning: "<why this framing is credible or weak>"
+        core_tension_axis: "<the deepest conflict axis this idea creates>"
+        decision_surface:
+          must_choose_between:
+            - "<choice A>"
+            - "<choice B>"
+          why_this_is_a_real_tradeoff: "<what makes this tension load-bearing>"
+      ```
+
+      If major gaps remain, add a short `gaps:` list at the end.
+    output: "intake_record"
+    timeout: 120
+
+  # ==========================================================================
+  # STEP 2: ROLE GENERATION
+  # ==========================================================================
+  - id: "role-generation"
+    agent: "amplihack:crucible-debate"
+    prompt: |
+      Generate adversarial spar roles for this idea in **spar** mode.
+
+      **Mode:** spar
+      **Idea Intake:**
+      {{intake_record}}
+
+      Requirements:
+      1. Generate 2-3 roles only.
+      2. Roles must be domain-specific to this idea. Do NOT use generic bull/bear language.
+      3. Each role must embody a genuinely opposing worldview.
+      4. Each role must disagree for structural reasons, not stylistic ones.
+      5. Each role must optimize for something different and fear a different failure mode.
+
+      Return YAML only:
+
+      ```yaml
+      spar_roles:
+        domain: "<domain inferred from the idea>"
+        central_conflict: "<copy or refine the tension axis>"
+        roles:
+          - name: "<role name>"
+            worldview: "<what this role believes>"
+            optimizes_for: "<primary objective>"
+            fears: "<failure mode this role hates most>"
+            thesis: "<what this role will argue>"
+            conflict_with:
+              - "<role name it genuinely opposes>"
+        role_quality_check:
+          genuinely_distinct: true
+          anti_generic_note: "<why these are not just bull/bear with costumes>"
+      ```
+
+      If the roles collapse into cosmetic variants of the same worldview, regenerate them before answering.
+    output: "spar_roles"
+    timeout: 120
+
+  # ==========================================================================
+  # STEP 3: ISOLATED ARGUMENTATION
+  # ==========================================================================
+  - id: "isolated-argumentation"
+    agent: "amplihack:crucible-debate"
+    prompt: |
+      Run Crucible Spar isolated argumentation.
+
+      **Mode:** spar
+      **Rounds Requested:** {{num_rounds}}
+      **Idea Intake:**
+      {{intake_record}}
+
+      **Roles:**
+      {{spar_roles}}
+
+      CRITICAL ISOLATION RULE:
+      - Treat each role's output as sealed.
+      - A role may know the idea, the conflict axis, and the names/worldviews of rival roles.
+      - A role may NOT see rival role arguments, concessions, or wording before synthesis.
+      - Do not let roles converge, coordinate, or compromise inside this step.
+      - This step must preserve adversarial tension and prevent fake agreement.
+
+      Generate escalating sealed rounds:
+      - Round 1 (Probing): each role states its case with evidence and names what it believes is naïve in the idea.
+      - Round 2 (Challenging): each role attacks the weakest assumptions of rival worldviews without seeing their actual text.
+      - Round 3 (Hostile): each role tries to destroy the foundations of rival positions.
+
+      Use exactly the first {{num_rounds}} rounds from the progression above.
+
+      Return markdown with a trailing JSON block using this structure:
+
+      ```json
+      {
+        "mode": "spar",
+        "isolation_guarantee": "Each role argument was generated in sealed fashion without access to rival outputs.",
+        "rounds": [
+          {
+            "round": 1,
+            "intensity": "probing",
+            "sealed_arguments": [
+              {
+                "role": "role name",
+                "position": "opening position",
+                "evidence": ["supporting evidence or reasoning"],
+                "target_of_attack": "what assumption or rival worldview it would attack",
+                "load_bearing_assumptions": ["assumptions this role relies on"]
+              }
+            ]
+          }
+        ]
+      }
+      ```
+    output: "isolated_argumentation"
+    timeout: 180
+
+  # ==========================================================================
+  # STEP 4: FORCING-FUNCTION SYNTHESIS
+  # ==========================================================================
+  - id: "forcing-function-synthesis"
+    agent: "amplihack:crucible-debate"
+    prompt: |
+      Synthesize this spar into a forcing function.
+
+      **Mode:** spar
+      **Idea Intake:**
+      {{intake_record}}
+
+      **Roles:**
+      {{spar_roles}}
+
+      **Isolated Argumentation:**
+      {{isolated_argumentation}}
+
+      Hard rules:
+      1. You must NOT make the decision for the human.
+      2. You must force a real choice between two incompatible paths.
+      3. No balanced output. No hedging. No "it depends". No middle-way mush.
+      4. The forcing function is the key output.
+      5. There is NO kill authority here; human retains total decision authority.
+
+      Produce a **SparReport** that includes:
+      - Refined problem statement
+      - Forced choice: "You must choose X or Y"
+      - What is lost if X is chosen
+      - What is lost if Y is chosen
+      - Exposed assumptions
+      - Strongest objection
+      - Unresolved tensions
+      - Validation pre-seed: what a later validation-mode debate should test next
+
+      Return markdown with a trailing JSON block:
+
+      ```json
+      {
+        "report_type": "SparReport",
+        "mode": "spar",
+        "refined_problem_statement": "<sharpened statement of the real problem>",
+        "forcing_function": {
+          "prompt": "You must choose X or Y.",
+          "option_x": "<path X>",
+          "if_x_you_lose": ["<loss 1>", "<loss 2>"],
+          "option_y": "<path Y>",
+          "if_y_you_lose": ["<loss 1>", "<loss 2>"]
+        },
+        "exposed_assumptions": ["<assumption>"],
+        "strongest_objection": "<the best attack that still stands>",
+        "unresolved_tensions": ["<tension>"],
+        "validation_preseed": {
+          "question": "<what should validation mode test next?>",
+          "must_verify": ["<claim to verify>"]
+        },
+        "decision_authority": "human"
+      }
+      ```
+    output: "spar_report"
+    timeout: 180
+
+  # ==========================================================================
+  # STEP 5: RUBBER DUCK REVIEW
+  # ==========================================================================
+  - id: "rubber-duck-review"
+    agent: "amplihack:crucible-rubber-duck"
+    prompt: |
+      Review this Crucible Spar workflow output for quality failures.
+
+      **phase:** spar-synthesis
+
+      **content:**
+      Intake:
+      {{intake_record}}
+
+      Roles:
+      {{spar_roles}}
+
+      Argumentation:
+      {{isolated_argumentation}}
+
+      SparReport:
+      {{spar_report}}
+
+      **prior_critiques:**
+      none
+
+      Focus especially on:
+      - strawmen
+      - false dichotomies
+      - balanced mush that fails to force a decision
+      - roles that are not genuinely different
+      - fake adversarial tension or premature convergence
+
+      Return YAML only following your standard output contract.
+    output: "rubber_duck_review"
+    timeout: 120

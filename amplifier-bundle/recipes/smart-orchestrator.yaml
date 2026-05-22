@@ -31,6 +31,7 @@ context:
   session_complete_status: ""
   force_single_workstream: "false" # set to "true" to prevent parallel decomposition
   adaptive_recipe: "" # set by detect-execution-gap when routing fails
+  validate_recipe: "" # selected Crucible recipe for VALIDATE tasks
   infra_error_details: "" # diagnostic info for infrastructure failures
 
 context_validation:
@@ -46,10 +47,6 @@ steps:
     command: |
       ERRORS=""
       REPO="{{repo_path}}"
-      TASK="{{task_description}}"
-      if [ -z "$TASK" ]; then
-        ERRORS="${ERRORS}\n  ✗ task_description is empty"
-      fi
       if [ ! -d "$REPO" ]; then
         ERRORS="${ERRORS}\n  ✗ repo_path '$REPO' does not exist"
       elif ! git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1; then
@@ -139,13 +136,27 @@ steps:
       REQUEST: {{task_description}}
 
       Classify and decompose:
-      1. task_type: Q&A | Operations | Investigation | Development
+      1. task_type: Q&A | Operations | Investigation | Development | VALIDATE
       2. goal: clear 1-sentence goal
       3. success_criteria: numbered list of verifiable criteria
       4. workstreams: array of independent parallel units
          - 1 workstream for cohesive/sequential tasks
          - 2-5 for CLEARLY INDEPENDENT components
-         - recipe: "default-workflow" (dev) | "investigation-workflow" (research)
+         - VALIDATE tasks MUST use exactly 1 workstream
+         - recipe: "default-workflow" (dev) | "investigation-workflow" (research) | "crucible-refine" | "crucible-scout" | "crucible-spar" | "crucible-commercial" | "crucible-internal" | "crucible-research"
+
+      VALIDATE classification:
+      - Use VALIDATE for idea-validation / build-vs-buy / viability tasks, especially if REQUEST contains:
+        "should I build", "should we build", "validate idea", "validate this",
+        "is this viable", "worth building", "build vs buy", "build or buy",
+        "kill or build", "idea validation", or "crucible".
+      - Route VALIDATE tasks to exactly one Crucible recipe:
+        - `crucible-internal` for internal tools, org/team workflows, or build-vs-buy decisions
+        - `crucible-commercial` for product/market viability or "should I/we build this?" requests
+        - `crucible-refine` for vague or half-baked ideas that need clarification first
+        - `crucible-scout` for landscape/competitor mapping without verdict authority
+        - `crucible-spar` for pressure-testing without final go/no-go authority
+        - `crucible-research` for curiosity-driven possibility exploration
 
       Decomposition override: {{force_single_workstream}} — if "true", use exactly 1 workstream.
 
@@ -244,7 +255,11 @@ steps:
           # Do NOT print to stdout — stdout is captured as the output variable
           # and box-drawing characters would corrupt downstream template substitution
 
-      task_type = h.normalise_type(obj.get("task_type", "Development"))
+      raw_task_type = str(obj.get("task_type", "Development") or "").strip()
+      if raw_task_type.upper() == "VALIDATE":
+          task_type = "VALIDATE"
+      else:
+          task_type = h.normalise_type(raw_task_type)
       print(task_type)
       PYEOF
     output: "task_type"
@@ -336,6 +351,41 @@ steps:
       printf '%s' {{force_single_workstream}}
     output: "force_single_workstream"
 
+  - id: "extract-validate-recipe"
+    agent: "amplihack:crucible-intake"
+    condition: "'VALIDATE' in task_type"
+    prompt: |
+      Select the Crucible recipe for this VALIDATE task.
+
+      **Task classification/decomposition:**
+      {{decomposition_json}}
+
+      If the workstream already names one of these allowed recipes, preserve it:
+      - crucible-refine
+      - crucible-scout
+      - crucible-spar
+      - crucible-commercial
+      - crucible-internal
+      - crucible-research
+
+      Otherwise select by intent:
+      - crucible-internal for build-vs-buy, internal tools, org/team workflows
+      - crucible-scout for landscape/competitor mapping without verdict authority
+      - crucible-spar for pressure-testing without final go/no-go authority
+      - crucible-refine for vague or half-baked ideas needing clarification
+      - crucible-research for curiosity-driven possibility exploration
+      - crucible-commercial as the default product/market viability mode
+
+      Return JSON only:
+      ```json
+      {
+        "recipe": "crucible-commercial",
+        "reasoning": "why this recipe fits"
+      }
+      ```
+    parse_json: true
+    output: "validate_recipe"
+
   # ─────────────────────────────────────────────────────────────────────────
   # Setup: register this session in the session tree (atomic check+register)
   # Runs for Development and Investigation tasks before any workstream spawning.
@@ -415,6 +465,60 @@ steps:
       **Repo**: {{repo_path}}
 
       Perform the operation, report what was done. End with "STATUS: COMPLETE".
+    output: "round_1_result"
+
+  - id: "execute-single-round-1-validate-refine"
+    type: "recipe"
+    condition: "'VALIDATE' in task_type and validate_recipe.recipe == 'crucible-refine'"
+    recipe: "crucible-refine"
+    sub_context:
+      raw_idea: "{{task_description}}"
+      repo_path: "{{repo_path}}"
+    output: "round_1_result"
+
+  - id: "execute-single-round-1-validate-scout"
+    type: "recipe"
+    condition: "'VALIDATE' in task_type and validate_recipe.recipe == 'crucible-scout'"
+    recipe: "crucible-scout"
+    sub_context:
+      idea_description: "{{task_description}}"
+      repo_path: "{{repo_path}}"
+    output: "round_1_result"
+
+  - id: "execute-single-round-1-validate-spar"
+    type: "recipe"
+    condition: "'VALIDATE' in task_type and validate_recipe.recipe == 'crucible-spar'"
+    recipe: "crucible-spar"
+    sub_context:
+      idea_description: "{{task_description}}"
+      repo_path: "{{repo_path}}"
+    output: "round_1_result"
+
+  - id: "execute-single-round-1-validate-commercial"
+    type: "recipe"
+    condition: "'VALIDATE' in task_type and validate_recipe.recipe == 'crucible-commercial'"
+    recipe: "crucible-commercial"
+    sub_context:
+      idea_description: "{{task_description}}"
+      repo_path: "{{repo_path}}"
+    output: "round_1_result"
+
+  - id: "execute-single-round-1-validate-internal"
+    type: "recipe"
+    condition: "'VALIDATE' in task_type and validate_recipe.recipe == 'crucible-internal'"
+    recipe: "crucible-internal"
+    sub_context:
+      idea_description: "{{task_description}}"
+      repo_path: "{{repo_path}}"
+    output: "round_1_result"
+
+  - id: "execute-single-round-1-validate-research"
+    type: "recipe"
+    condition: "'VALIDATE' in task_type and validate_recipe.recipe == 'crucible-research'"
+    recipe: "crucible-research"
+    sub_context:
+      idea_description: "{{task_description}}"
+      repo_path: "{{repo_path}}"
     output: "round_1_result"
 
   # ─────────────────────────────────────────────────────────────────────────
@@ -732,7 +836,7 @@ steps:
       FORCE_SINGLE={{force_single_workstream}}
       GUARD={{recursion_guard}}
       RECIPE={{adaptive_recipe}}
-      TASK_DESC=$(printf '%s' {{task_description}})
+      TASK_DESC="<omitted: task description is not interpolated into shell diagnostics>"
 
       # Build diagnostic body
       BODY=$(cat <<EOFBODY
@@ -864,7 +968,7 @@ steps:
   - id: "execute-round-2"
     type: "agent"
     condition: |
-      reflection_1 and ('PARTIAL' in reflection_1 or 'NOT_ACHIEVED' in reflection_1 or 'HOLLOW' in reflection_1)
+      'VALIDATE' not in task_type and reflection_1 and ('PARTIAL' in reflection_1 or 'NOT_ACHIEVED' in reflection_1 or 'HOLLOW' in reflection_1)
     agent: "amplihack:core:builder"
     prompt: |
       Round 1 was incomplete. Continue from where it left off.

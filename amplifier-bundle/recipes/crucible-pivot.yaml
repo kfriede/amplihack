@@ -1,0 +1,390 @@
+name: "crucible-pivot"
+description: "Idea resurrection — analyzes killed ideas for salvageable elements and generates alternative framings"
+version: "1.0.0"
+author: "Amplihack Team"
+tags: ["crucible", "pivot", "resurrection", "kill-report", "alternative"]
+
+# CRUCIBLE_PIVOT: Idea Resurrection and Final Kill
+#
+# Takes a killed idea and finds a viable alternative framing.
+# This is the only Crucible mode with authority to issue a FINAL KILL,
+# permanently closing an exhausted idea space.
+#
+# WHEN TO USE:
+#   - After a KILL verdict from crucible-commercial or crucible-internal
+#   - When revisiting a historical KillReport to find salvageable value
+#   - When the original idea failed, but parts of the insight may still matter
+#
+# WHEN NOT TO USE:
+#   - The idea has not been killed yet
+#   - The framing is still vague and needs clarification first (use crucible-refine)
+#   - You want adversarial sharpening without verdict authority (use crucible-spar)
+#
+# PHASES (5 Steps):
+#   1. Analyze Kill - Separate fundamental flaws from framing-dependent flaws
+#   2. Generate Pivots - Produce 3-5 genuinely different alternative framings
+#   3. Rubber Duck Review - Reject cosmetic pivots and score inflation
+#   4. Evaluate Final Kill - Decide re-entry, caveated pivot, or Final Kill
+#   5. Assemble Output - Emit PivotBrief or FinalKill payload
+#
+# DESIGN RULES:
+#   - Every pivot must be genuinely different from the original idea
+#   - Cosmetic rewording is failure and must be flagged explicitly
+#   - Final Kill is allowed only here, never in refine / scout / spar modes
+#   - Best surviving pivot must include a ready-to-use IdeaCapture for re-entry
+#
+# Usage:
+#   amplihack recipe run amplifier-bundle/recipes/crucible-pivot.yaml \
+#     -c kill_report="<KillReport content>" \
+#     -c original_idea="<original idea description>" \
+#     -c repo_path="."
+
+recursion:
+  max_depth: 4
+  max_total_steps: 20
+
+context:
+  # ==========================================================================
+  # REQUIRED INPUTS
+  # ==========================================================================
+
+  # KillReport content from a previous KILL verdict
+  kill_report: ""
+
+  # Original idea description that was killed
+  original_idea: ""
+
+  # ==========================================================================
+  # CONFIGURATION OPTIONS
+  # ==========================================================================
+
+  # Working directory / repo-aware context
+  repo_path: "."
+
+  # ==========================================================================
+  # INTERNAL STATE (populated during execution)
+  # ==========================================================================
+  kill_analysis: ""
+  pivot_options: ""
+  pivot_review: ""
+  final_evaluation: ""
+  final_output: ""
+
+steps:
+  # ==========================================================================
+  # STEP 1: ANALYZE KILL
+  # ==========================================================================
+  - id: "analyze-kill"
+    agent: "amplihack:crucible-debate"
+    parse_json: true
+    prompt: |
+      Analyze this killed idea for salvageable value in Crucible Pivot mode.
+
+      **Original Idea:**
+      {{original_idea}}
+
+      **KillReport:**
+      {{kill_report}}
+
+      **Repo Path:** {{repo_path}}
+
+      Your task:
+      1. Identify exactly what killed the idea.
+      2. Separate fatal flaws into `fundamental` vs `framing_dependent`.
+      3. Identify what was genuinely strong in the idea.
+      4. Extract salvageable elements: problem insight, audience truth, technical novelty,
+         distribution insight, operational constraint, or timing signal.
+      5. Propose pivot requirements that any resurrection attempt must satisfy.
+      6. Emit reusable pattern tags for future learning.
+
+      Rules:
+      - Be blunt. Do not soften the original kill.
+      - A flaw is `fundamental` only if the idea space itself is structurally broken.
+      - A flaw is `framing_dependent` if a materially different framing could escape it.
+      - Preserve any valid insight even when the product framing died.
+
+      Return JSON only:
+      ```json
+      {
+        "report_type": "KillAutopsy",
+        "kill_summary": "one-paragraph summary of what killed the idea",
+        "fatal_flaws": [
+          {
+            "flaw": "fatal flaw text",
+            "classification": "fundamental | framing_dependent",
+            "reasoning": "why this classification is correct",
+            "evidence": ["supporting evidence from the kill report"]
+          }
+        ],
+        "salvageable_strengths": ["what was genuinely good about the idea"],
+        "salvageable_elements": {
+          "problem_insight": ["real problem insight worth preserving"],
+          "audience_truth": ["audience fact or user pain worth keeping"],
+          "technical_interest": ["technical or capability insight worth keeping"],
+          "distribution_or_operational_signal": ["channel, timing, workflow, or constraint insight"]
+        },
+        "pivot_requirements": ["what any viable pivot must change or preserve"],
+        "pattern_tags": ["crowded_market", "timing_wrong"]
+      }
+      ```
+    output: "kill_analysis"
+    timeout: 180
+
+  # ==========================================================================
+  # STEP 2: GENERATE PIVOTS
+  # ==========================================================================
+  - id: "generate-pivots"
+    agent: "amplihack:crucible-intake"
+    parse_json: true
+    prompt: |
+      Generate 3-5 genuinely different pivot framings for this killed idea.
+
+      **Original Idea:**
+      {{original_idea}}
+
+      **Kill Autopsy:**
+      {{kill_analysis}}
+
+      **Repo Path:** {{repo_path}}
+
+      Requirements for every pivot:
+      1. It must be materially different from the original idea.
+      2. It must explicitly address at least one fatal flaw from the KillAutopsy.
+      3. It must state what new risk(s) the new framing introduces.
+      4. It must get a viability score from 0.0 to 1.0.
+      5. It must recommend which Crucible mode to run next.
+      6. It must include a ready-to-use IdeaCapture for re-entry.
+
+      Hard rules:
+      - Do NOT generate cosmetic variants or slogan rewrites.
+      - Do NOT merely narrow the idea unless the narrowness breaks a specific fatal flaw.
+      - Prefer fewer, sharper pivots over padding.
+      - If the idea space looks mostly dead, still produce the best 3 honest pivots and score them low.
+
+      Return JSON only:
+      ```json
+      {
+        "report_type": "PivotOptions",
+        "pivots": [
+          {
+            "pivot_id": "pivot-1",
+            "title": "short pivot title",
+            "reframed_idea": "new framing in plain language",
+            "how_it_differs": "why this is genuinely different from the original",
+            "addresses_fatal_flaw": "which flaw this pivot is designed to escape",
+            "new_risks": ["new risk introduced by the pivot"],
+            "viability_score": 0.67,
+            "recommended_next_mode": "commercial | internal | research | spar | scout | refine",
+            "idea_capture": {
+              "raw_input": "concise raw idea for the pivot",
+              "problem": "what problem the pivot solves",
+              "audience": "who has this problem",
+              "hypothesis": "why this framing could work",
+              "existing_alternatives": ["what exists today"],
+              "constraints": ["non-negotiable boundaries"],
+              "goal_type": "commercial | internal | research",
+              "suggested_mode": "commercial | internal | research | spar | scout | refine",
+              "confidence": "high | medium | low",
+              "reasoning": "why this pivot deserves the suggested next mode"
+            }
+          }
+        ]
+      }
+      ```
+    output: "pivot_options"
+    timeout: 180
+
+  # ==========================================================================
+  # STEP 3: RUBBER DUCK REVIEW
+  # ==========================================================================
+  - id: "rubber-duck-review"
+    agent: "amplihack:crucible-rubber-duck"
+    parse_json: true
+    prompt: |
+      Critically review these generated pivots for Crucible Pivot mode.
+
+      **phase:** pivot-review
+
+      **content:**
+      Original Idea:
+      {{original_idea}}
+
+      Kill Autopsy:
+      {{kill_analysis}}
+
+      Pivot Options:
+      {{pivot_options}}
+
+      **prior_critiques:**
+      none
+
+      Focus especially on:
+      - pivots that are the same idea with different words
+      - fake differentiation that does not escape the killing flaw
+      - inflated viability scores
+      - pivots that introduce a worse new risk than the original fatal flaw
+      - pivots whose suggested next mode is obviously wrong
+
+      Return JSON only:
+      ```json
+      {
+        "report_type": "PivotRubberDuckReview",
+        "overall_assessment": "brief blunt assessment",
+        "flagged_pivots": [
+          {
+            "pivot_id": "pivot-1",
+            "issue": "same idea with different words | inflated score | wrong next mode | new fatal flaw",
+            "severity": "low | medium | high",
+            "recommended_action": "keep | revise | drop",
+            "score_adjustment": -0.15,
+            "reasoning": "why this flag matters"
+          }
+        ],
+        "approved_pivots": ["pivot-2"],
+        "rejected_pivots": ["pivot-3"],
+        "score_honesty": {
+          "assessment": "honest | mixed | inflated",
+          "notes": ["where the scoring is too optimistic or too harsh"]
+        }
+      }
+      ```
+    output: "pivot_review"
+    timeout: 120
+
+  # ==========================================================================
+  # STEP 4: EVALUATE FINAL KILL
+  # ==========================================================================
+  - id: "evaluate-final-kill"
+    agent: "amplihack:crucible-debate"
+    parse_json: true
+    prompt: |
+      Evaluate whether this killed idea can be resurrected or deserves a Final Kill.
+
+      **Original Idea:**
+      {{original_idea}}
+
+      **Kill Autopsy:**
+      {{kill_analysis}}
+
+      **Pivot Options:**
+      {{pivot_options}}
+
+      **Rubber Duck Review:**
+      {{pivot_review}}
+
+      Decision rules:
+      1. If all surviving pivots score below 0.4 after critique, issue `FINAL_KILL`.
+      2. If the best surviving pivot scores above 0.6, issue `REENTER`.
+      3. If the best surviving pivot lands between 0.4 and 0.6 inclusive, issue `CAVEATED_PIVOT`.
+      4. Dropped pivots do not count as survivors.
+      5. Final Kill means the current idea space is exhausted. No further recourse.
+
+      Hard rules:
+      - Do not keep a dead idea alive through rhetoric.
+      - A pivot is only valid if it genuinely escapes the original kill logic.
+      - If the best pivot survives, recommend the specific next Crucible mode.
+      - Preserve learning via pattern tags and future idea lessons.
+
+      Return JSON only:
+      ```json
+      {
+        "report_type": "PivotEvaluation",
+        "decision": "FINAL_KILL | CAVEATED_PIVOT | REENTER",
+        "best_pivot_id": "pivot-2 | none",
+        "best_pivot_score": 0.58,
+        "decision_reasoning": "why this outcome is correct",
+        "recommended_next_mode": "commercial | internal | research | spar | scout | refine | none",
+        "caveats": ["caveat to carry into the next mode"],
+        "why_no_pivot_is_viable": "required when decision is FINAL_KILL",
+        "remember_for_future": ["lesson that should shape future ideas"],
+        "pattern_tags": ["crowded_market", "timing_wrong"]
+      }
+      ```
+    output: "final_evaluation"
+    timeout: 180
+
+  # ==========================================================================
+  # STEP 5: ASSEMBLE OUTPUT
+  # ==========================================================================
+  - id: "assemble-output"
+    agent: "amplihack:crucible-debate"
+    parse_json: true
+    prompt: |
+      Assemble the final Crucible Pivot output from these phase results.
+
+      **Original Idea:**
+      {{original_idea}}
+
+      **Kill Report:**
+      {{kill_report}}
+
+      **Kill Analysis:**
+      {{kill_analysis}}
+
+      **Pivot Options:**
+      {{pivot_options}}
+
+      **Rubber Duck Review:**
+      {{pivot_review}}
+
+      **Final Evaluation:**
+      {{final_evaluation}}
+
+      Return JSON only. Do not include markdown fences.
+
+      If `final_evaluation.decision` is `FINAL_KILL`, return:
+      ```json
+      {
+        "workflow": "crucible-pivot",
+        "version": "1.0.0",
+        "mode": "pivot",
+        "verdict": "FINAL_KILL",
+        "output_type": "FinalKill",
+        "final_kill": {
+          "why_no_pivot_is_viable": "why no pivot survived",
+          "what_was_good": ["salvageable strengths from kill_analysis"],
+          "what_killed_it": ["fatal flaws from kill_analysis"],
+          "pattern_tags": ["pattern tags from final_evaluation or kill_analysis"],
+          "remember_for_future": ["future lessons"],
+          "pivot_options_considered": ["all generated pivots"],
+          "rubber_duck_review": {},
+          "evidence_trail": {
+            "original_idea": "original idea text",
+            "kill_report": "kill report text",
+            "kill_analysis": {}
+          }
+        }
+      }
+      ```
+
+      Otherwise return:
+      ```json
+      {
+        "workflow": "crucible-pivot",
+        "version": "1.0.0",
+        "mode": "pivot",
+        "verdict": "PIVOT",
+        "output_type": "PivotBrief",
+        "pivot_brief": {
+          "what_was_good": ["salvageable strengths from kill_analysis"],
+          "what_killed_it": ["fatal flaws from kill_analysis"],
+          "pivot_options": ["all generated pivots"],
+          "recommended_pivot": {},
+          "recommended_status": "REENTER | CAVEATED_PIVOT",
+          "best_pivot_score": 0.0,
+          "recommended_next_mode": "commercial | internal | research | spar | scout | refine",
+          "caveats": ["caveats from final_evaluation"],
+          "decision_reasoning": "decision reasoning from final_evaluation",
+          "ready_idea_capture": {},
+          "pattern_tags": ["pattern tags from final_evaluation or kill_analysis"],
+          "rubber_duck_review": {},
+          "evidence_trail": {
+            "original_idea": "original idea text",
+            "kill_report": "kill report text",
+            "kill_analysis": {}
+          }
+        }
+      }
+      ```
+    output: "final_output"
+    timeout: 60

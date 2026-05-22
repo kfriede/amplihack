@@ -10,7 +10,7 @@ Replace the sections below with information about your project.
 
 ---
 
-## Project: issue-4385-in-claudeskills-replace-all-python-amplihack-refer
+## Project: amplihack
 
 ## Overview
 

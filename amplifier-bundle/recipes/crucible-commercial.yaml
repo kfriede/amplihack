@@ -1,0 +1,514 @@
+name: "crucible-commercial"
+description: "Commercial product validation — aggressive adversarial debate with single-fatal-flaw kill threshold"
+version: "1.0.0"
+author: "Amplihack Team"
+tags: ["crucible", "commercial", "validation", "market", "adversarial"]
+
+# CRUCIBLE_COMMERCIAL: Commercial Product Validation
+#
+# Full adversarial validation for products intended to make money.
+# This is the hardest Crucible mode: any single fatal market flaw can kill the idea.
+#
+# PURPOSE:
+#   - Decide whether a commercial product idea deserves to exist at all
+#   - Force Bull to prove real demand, differentiation, reachability, and viability
+#   - Kill weak ideas early when a single fatal flaw is enough to break the case
+#   - Produce either a ProductBrief, KillReport, or pivot handoff
+#
+# WHEN TO USE:
+#   - "I want to sell this. Should I build it?"
+#   - A product idea needs real market validation before implementation
+#   - Revenue, pricing, distribution, and competitor pressure matter
+#   - The user wants a go / no-go answer, not brainstorming
+#
+# WHEN NOT TO USE:
+#   - The idea is still too vague to validate (use crucible-refine first)
+#   - You want landscape mapping without judgment (use scout mode)
+#   - You want adversarial sharpening without verdict authority (use crucible-spar)
+#   - The idea is internal-only and does not depend on market success
+#
+# PHASES (8 Steps):
+#   1. Intake - Parse the idea and force commercial framing
+#   2. Market Research - Gather adversarial validation evidence with market focus
+#   3. Research Rubber Duck - Attack confirmation bias and weak market claims
+#   4. Debate - Apply commercial burden of proof and single-fatal-flaw kill threshold
+#   5. Debate Rubber Duck - Catch strawmen, fake survival, and weak argument quality
+#   6. Spec - If and only if PROCEED, generate ProductBrief + technical and GTM spec
+#   7. Spec Rubber Duck - Expose hidden complexity and feasibility gaps
+#   8. Assemble Output - Emit ProductBrief, KillReport, or pivot handoff
+#
+# Usage:
+#   amplihack recipe run amplifier-bundle/recipes/crucible-commercial.yaml -c idea_description="A commercial product idea" -c repo_path="."
+
+recursion:
+  max_depth: 4
+  max_total_steps: 24
+
+context:
+  # ==========================================================================
+  # REQUIRED INPUTS
+  # ==========================================================================
+
+  # The commercial product idea to validate
+  idea_description: ""
+
+  # ==========================================================================
+  # OPTIONAL INPUTS / CONFIGURATION
+  # ==========================================================================
+
+  # Prior research from earlier Crucible modes (ScoutReport / SparReport)
+  prior_research: ""
+
+  # Working directory / repo-aware context
+  repo_path: "."
+
+  # Validation mode is fixed for this recipe
+  goal_type: "commercial"
+  research_mode: "validation"
+  burden_of_proof: "bull"
+  kill_threshold: "single_fatal_flaw"
+  verdicts: ["PROCEED", "KILL", "PIVOT"]
+
+  kill_gates:
+    - "No clear path to 100 paying users in 90 days"
+    - "Indistinguishable from top-3 existing solutions"
+    - "Unit economics require >10x current market rates"
+
+  commercial_gut_checks:
+    - "Does a Google search for this problem return solutions?"
+    - "Would you pay for this yourself?"
+
+  # ==========================================================================
+  # INTERNAL STATE (populated during execution)
+  # ==========================================================================
+  intake_record: ""
+  research_findings: ""
+  research_review: ""
+  debate_result: ""
+  debate_review: ""
+  product_spec: ""
+  spec_review: ""
+  final_output: ""
+
+steps:
+  # ==========================================================================
+  # STEP 1: INTAKE
+  # ==========================================================================
+  - id: "intake"
+    agent: "amplihack:crucible-intake"
+    prompt: |
+      Structure this raw idea for Crucible Commercial mode.
+
+      **Idea Description:**
+      {{idea_description}}
+
+      **Goal Type Override:** commercial
+      **Suggested Mode Override:** commercial
+
+      Your task:
+      1. Parse the idea into a structured Crucible intake record.
+      2. Force the framing into commercial validation mode even if the raw description is fuzzy.
+      3. Surface missing buyer, demand, pricing, and reachability information bluntly.
+      4. Preserve the user's raw input verbatim.
+      5. Call out where the idea is solution-shaped but market-thin.
+
+      Focus especially on:
+      - who would pay
+      - what painful problem is being solved
+      - what currently substitutes for this
+      - what must be true for the product to sell
+      - what critical commercial unknowns remain
+
+      Return YAML only using your standard intake contract.
+      After the YAML block, add a short `Gaps:` section with the commercial unknowns
+      that matter most for survival.
+    output: "intake_record"
+    timeout: 120
+
+  # ==========================================================================
+  # STEP 2: MARKET RESEARCH
+  # ==========================================================================
+  - id: "market-research"
+    agent: "amplihack:crucible-researcher"
+    prompt: |
+      Run Crucible **validation mode** research for a commercial product idea.
+
+      **Mode:** {{research_mode}}
+      **Goal Type:** {{goal_type}}
+      **Repo Path:** {{repo_path}}
+
+      **Idea Intake:**
+      {{intake_record}}
+
+      **Prior Research (optional):**
+      {{prior_research}}
+
+      Requirements:
+      1. Research market sizing with an explicit method: TAM / SAM / SOM if defensible, otherwise N/A.
+      2. Identify direct competitors, indirect alternatives, and top-3 incumbents the product would need to beat.
+      3. Evaluate distribution channels and realistic user acquisition paths.
+      4. Find pricing precedents and willingness-to-pay signals.
+      5. Surface evidence both for and against the idea.
+      6. Be more aggressive than internal mode: vague market optimism is failure.
+      7. If concrete data is unavailable, say so explicitly rather than backfilling with startup clichés.
+
+      Give special attention to these commercial kill questions:
+      - Is there a realistic path to 100 paying users in 90 days?
+      - Is the idea obviously differentiated from the top-3 existing solutions?
+      - Do plausible unit economics fit within current market rates?
+
+      Return YAML only using your standard validation-mode research contract.
+    output: "research_findings"
+    timeout: 180
+
+  # ==========================================================================
+  # STEP 3: RESEARCH RUBBER DUCK
+  # ==========================================================================
+  - id: "research-rubber-duck"
+    agent: "amplihack:crucible-rubber-duck"
+    prompt: |
+      Review this Crucible Commercial research output for quality failures.
+
+      **phase:** research-validation
+
+      **content:**
+      Intake:
+      {{intake_record}}
+
+      Prior Research:
+      {{prior_research}}
+
+      Research Findings:
+      {{research_findings}}
+
+      **prior_critiques:**
+      none
+
+      Focus especially on:
+      - confirmation bias
+      - missing competitors or substitutes
+      - inflated or weakly defended market estimates
+      - fake certainty around pricing or reachability
+      - evidence asymmetry where negative signals were ignored
+
+      Return YAML only following your standard output contract.
+    output: "research_review"
+    timeout: 120
+
+  # ==========================================================================
+  # STEP 4: DEBATE
+  # ==========================================================================
+  - id: "debate"
+    agent: "amplihack:crucible-debate"
+    parse_json: true
+    prompt: |
+      Run a Crucible Commercial adversarial debate on whether this product should exist.
+
+      **Mode:** commercial
+      **Burden of Proof:** {{burden_of_proof}}
+      **Kill Threshold:** {{kill_threshold}}
+      **Allowed Verdicts:** {{verdicts}}
+
+      **Idea Intake:**
+      {{intake_record}}
+
+      **Research Findings:**
+      {{research_findings}}
+
+      **Research Rubber Duck Critique:**
+      {{research_review}}
+
+      Hard rules:
+      1. Bull carries the burden of proof. Bull must PROVE the product should exist and can succeed.
+      2. Absence of positive evidence counts against Bull.
+      3. Single fatal flaw kills unless a narrower pivot clearly escapes it.
+      4. No SIMPLIFY verdict. Commercial products do not survive by half-existing.
+      5. Bull must establish demand, differentiation, distribution feasibility, and viable economics.
+      6. Bear must attack the strongest version of Bull's case, not a strawman.
+      7. The synthesis must take a position. No balanced mush.
+
+      Evaluate these kill gates explicitly:
+      - {{kill_gates[0]}}
+      - {{kill_gates[1]}}
+      - {{kill_gates[2]}}
+
+      Apply these commercial gut checks explicitly:
+      - {{commercial_gut_checks[0]}} (if yes, differentiation burden rises)
+      - {{commercial_gut_checks[1]}}
+
+      Return JSON only using this shape:
+      ```json
+      {
+        "report_type": "CommercialDebateResult",
+        "mode": "commercial",
+        "verdict": "PROCEED | KILL | PIVOT",
+        "confidence": "high | medium | low",
+        "burden_of_proof": "bull",
+        "kill_threshold": "single_fatal_flaw",
+        "bull_summary": {
+          "strongest_argument": "best case for building",
+          "evidence": ["supporting evidence"],
+          "weakest_point": "where Bull was most vulnerable"
+        },
+        "bear_summary": {
+          "strongest_argument": "best case against building",
+          "evidence": ["supporting evidence"],
+          "weakest_point": "where Bear was most vulnerable"
+        },
+        "kill_gates_evaluated": [
+          {
+            "gate": "kill gate text",
+            "triggered": true,
+            "reasoning": "why"
+          }
+        ],
+        "commercial_gut_checks": [
+          {
+            "check": "gut check text",
+            "assessment": "answer and why it matters"
+          }
+        ],
+        "synthesis": {
+          "surviving_arguments": ["arguments that survived challenge"],
+          "fatal_flaws": ["fatal flaws that remain"],
+          "verdict_reasoning": "why this verdict is correct",
+          "differentiation_assessment": "clear / weak / absent",
+          "path_to_100_paying_users": "credible / unclear / absent",
+          "unit_economics_assessment": "plausible / strained / broken"
+        },
+        "kill_type": "market_fatal | technical_fatal | distribution_fatal | economics_fatal | differentiation_fatal | evidence_fatal | none",
+        "pivot_candidates": [
+          {
+            "description": "alternative framing",
+            "avoids_flaw": "which fatal flaw this avoids",
+            "estimated_viability": "high | medium | low"
+          }
+        ]
+      }
+      ```
+    output: "debate_result"
+    timeout: 240
+
+  # ==========================================================================
+  # STEP 5: DEBATE RUBBER DUCK
+  # ==========================================================================
+  - id: "debate-rubber-duck"
+    agent: "amplihack:crucible-rubber-duck"
+    prompt: |
+      Review this Crucible Commercial debate output for quality failures.
+
+      **phase:** commercial-debate
+
+      **content:**
+      Intake:
+      {{intake_record}}
+
+      Research Findings:
+      {{research_findings}}
+
+      Research Critique:
+      {{research_review}}
+
+      Debate Result:
+      {{debate_result}}
+
+      **prior_critiques:**
+      {{research_review}}
+
+      Focus especially on:
+      - strawmen or weak attacks
+      - sycophantic survival where Bull did not actually meet burden of proof
+      - fake neutrality or balanced mush
+      - failure to apply single-fatal-flaw kill logic
+      - argument quality gaps around market reachability, differentiation, or economics
+
+      Return YAML only following your standard output contract.
+    output: "debate_review"
+    timeout: 120
+
+  # ==========================================================================
+  # STEP 6: SPEC (PROCEED ONLY)
+  # ==========================================================================
+  - id: "spec"
+    condition: "debate_result.verdict == 'PROCEED'"
+    agent: "amplihack:architect"
+    prompt: |
+      Create the commercial ProductBrief and execution spec for an idea that SURVIVED Crucible Commercial mode.
+
+      **Idea Intake:**
+      {{intake_record}}
+
+      **Research Findings:**
+      {{research_findings}}
+
+      **Debate Result:**
+      {{debate_result}}
+
+      **Debate Rubber Duck Critique:**
+      {{debate_review}}
+
+      Requirements:
+      1. Generate a technical specification plus go-to-market elements.
+      2. Cover architecture, stack, MVP scope, distribution strategy, pricing model, and first milestone.
+      3. Make differentiation concrete, not slogan-level.
+      4. Keep the MVP commercially coherent — small is fine, fake scope is not.
+      5. Include user stories tied to the paying-user hypothesis.
+      6. Include an evidence trail back to intake, research, and debate outputs.
+      7. Include handoff metadata for downstream implementation.
+
+      Return markdown with a trailing JSON block.
+
+      The markdown must be titled `# ProductBrief` and include these sections in order:
+      1. Executive Summary
+      2. Market Section
+         - size_estimate
+         - competitors
+         - differentiation
+         - go_to_market
+      3. Technical Specification
+      4. MVP Scope
+      5. User Stories
+      6. Pricing Model
+      7. First Milestone
+      8. Evidence Trail
+      9. Handoff Metadata
+
+      Use this JSON block shape at the end:
+      ```json
+      {
+        "report_type": "ProductBrief",
+        "market": {
+          "size_estimate": "...",
+          "competitors": ["..."],
+          "differentiation": ["..."],
+          "go_to_market": ["..."]
+        },
+        "technical_spec": {
+          "architecture": "...",
+          "stack": ["..."],
+          "integration_points": ["..."],
+          "key_risks": ["..."]
+        },
+        "mvp_scope": {
+          "must_have": ["..."],
+          "should_wait": ["..."]
+        },
+        "user_stories": [
+          {
+            "as_a": "buyer or user",
+            "i_want": "...",
+            "so_that": "..."
+          }
+        ],
+        "pricing_model": {
+          "model": "...",
+          "starting_price": "...",
+          "rationale": "..."
+        },
+        "first_milestone": {
+          "goal": "...",
+          "success_metric": "...",
+          "delivery_window": "..."
+        },
+        "evidence_trail": {
+          "intake": ["..."],
+          "research": ["..."],
+          "debate": ["..."]
+        },
+        "handoff_metadata": {
+          "next_mode": "default-workflow",
+          "implementation_ready": true,
+          "commercial_assumptions_to_monitor": ["..."]
+        }
+      }
+      ```
+    output: "product_spec"
+    timeout: 240
+
+  # ==========================================================================
+  # STEP 7: SPEC RUBBER DUCK (PROCEED ONLY)
+  # ==========================================================================
+  - id: "spec-rubber-duck"
+    condition: "debate_result.verdict == 'PROCEED'"
+    agent: "amplihack:crucible-rubber-duck"
+    prompt: |
+      Review this ProductBrief / commercial spec for hidden complexity and feasibility gaps.
+
+      **phase:** commercial-spec
+
+      **content:**
+      Debate Result:
+      {{debate_result}}
+
+      Product Spec:
+      {{product_spec}}
+
+      **prior_critiques:**
+      {{research_review}}
+      {{debate_review}}
+
+      Focus especially on:
+      - hidden technical complexity
+      - feasibility gaps disguised as roadmap optimism
+      - missing dependencies or integration assumptions
+      - evidence trail claims that outrun the underlying research
+      - commercial scope that no longer matches the surviving thesis
+
+      Return YAML only following your standard output contract.
+    output: "spec_review"
+    timeout: 120
+
+  # ==========================================================================
+  # STEP 8: ASSEMBLE OUTPUT
+  # ==========================================================================
+  - id: "assemble-output"
+    agent: "amplihack:crucible-debate"
+    prompt: |
+      Assemble the final Crucible Commercial output.
+
+      **Kill Threshold:** {{kill_threshold}}
+      **Burden of Proof:** {{burden_of_proof}}
+      **Repo Path:** {{repo_path}}
+
+      **Debate Result:**
+      {{debate_result}}
+
+      **Product Spec (present only when verdict is PROCEED):**
+      {{product_spec}}
+
+      **Spec Rubber Duck Review:**
+      {{spec_review}}
+
+      **Debate Rubber Duck Review:**
+      {{debate_review}}
+
+      **Research Rubber Duck Review:**
+      {{research_review}}
+
+      Return a concise final report.
+
+      If verdict is PROCEED, include:
+      - Workflow, version, status, verdict, output type ProductBrief
+      - ProductBrief
+      - spec, debate, and research reviews
+      - handoff note: next mode default-workflow; cleared for build planning with market assumptions preserved
+
+      If verdict is KILL, include:
+      - Workflow, version, status, verdict, output type KillReport
+      - kill_type, fatal flaws, kill gates evaluated
+      - Bull's best case and evidence
+      - Bear's killing blow and evidence
+      - debate reasoning
+      - pivot candidates
+      - debate and research reviews
+
+      If verdict is PIVOT, include:
+      - Workflow, version, status, verdict, output type Pivot Handoff
+      - why the current framing failed
+      - pivot candidates
+      - Bull's best surviving insight
+      - Bear's winning objection
+      - debate and research reviews
+      - next step: re-enter Crucible using a narrower pivot framing or run crucible-spar to sharpen the strongest candidate
+    output: "final_output"
+    timeout: 60

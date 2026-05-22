@@ -1,0 +1,262 @@
+name: "crucible-refine"
+description: "Socratic idea refinement — transforms vague ideas into structured IdeaCaptures through guided questioning"
+version: "1.0.0"
+author: "Amplihack Team"
+tags: ["crucible", "refine", "socratic", "idea-validation"]
+
+# CRUCIBLE_REFINE: Socratic Idea Refinement
+#
+# Transforms a vague or half-baked idea into a structured IdeaCapture through
+# guided questioning and disciplined reflection.
+#
+# PURPOSE:
+#   - Clarify ideas without killing them
+#   - Separate stated facts from inference
+#   - Surface gaps that matter before deeper validation modes
+#   - Produce an enriched IdeaCapture ready for downstream Crucible workflows
+#
+# WHEN TO USE:
+#   - "I have a half-baked thought and need help articulating it"
+#   - Raw idea is promising but underspecified
+#   - Problem, audience, hypothesis, or constraints are still fuzzy
+#
+# WHEN NOT TO USE:
+#   - User already wants adversarial pressure-testing (use spar)
+#   - User needs market / landscape research (use scout)
+#   - User already has a structured brief ready for validation
+#
+# PHASES (5 Steps):
+#   1. Intake Parse - Extract what is stated vs missing
+#   2. Socratic Clarification - Ask focused questions around gaps
+#   3. Structured Reflection - Produce final IdeaCapture
+#   4. Rubber Duck Review - Critique framing quality without kill authority
+#   5. Output Summary - Present refined idea plus critiques for confirmation
+#
+# DESIGN RULES:
+#   - No kill authority: this mode clarifies, it does not reject
+#   - Rubber duck review happens after final reflection, before user confirmation
+#   - Output must stay usable by downstream Crucible modes
+
+recursion:
+  max_depth: 4
+  max_total_steps: 50
+
+context:
+  # ==========================================================================
+  # REQUIRED INPUTS
+  # ==========================================================================
+
+  # The user's raw, messy idea description
+  raw_idea: ""
+
+  # ==========================================================================
+  # CONFIGURATION OPTIONS
+  # ==========================================================================
+
+  # Maximum Socratic clarification rounds to run internally
+  max_rounds: "5"
+
+  # Working directory / repo root
+  repo_path: "."
+
+  # ==========================================================================
+  # INTERNAL STATE (populated during execution)
+  # ==========================================================================
+  parsed_intake: ""
+  socratic_clarification: ""
+  idea_capture: ""
+  rubber_duck_review: ""
+  final_summary: ""
+
+steps:
+  # ==========================================================================
+  # STEP 1: INTAKE PARSE
+  # Initial parsing of the raw idea into structured form
+  # ==========================================================================
+  - id: "intake-parse"
+    agent: "amplihack:crucible-intake"
+    prompt: |
+      Parse this raw idea into a structured intake record.
+
+      **Raw Idea:**
+      {{raw_idea}}
+
+      Your task:
+      1. Extract what is explicitly stated
+      2. Mark conservative inferences clearly
+      3. Identify what is missing or still muddy
+      4. Preserve the user's raw input verbatim
+      5. Suggest the best downstream mode, but do not kill or reject the idea
+
+      Focus especially on:
+      - problem clarity
+      - audience specificity
+      - hypothesis strength
+      - existing alternatives
+      - constraint completeness
+
+      Return a single structured YAML block using your standard intake contract.
+      After the YAML block, include a short `Gaps:` section with direct bullets for
+      what remains underspecified.
+    output: "parsed_intake"
+    timeout: 120
+
+  # ==========================================================================
+  # STEP 2: SOCRATIC CLARIFICATION
+  # Ask clarifying questions about the gaps from intake parsing
+  # ==========================================================================
+  - id: "socratic-clarification"
+    agent: "amplihack:crucible-intake"
+    prompt: |
+      Run a Socratic clarification pass on this partially structured idea.
+
+      **Raw Idea:**
+      {{raw_idea}}
+
+      **Parsed Intake:**
+      {{parsed_intake}}
+
+      You are in Crucible Refine mode.
+
+      Rules:
+      - Clarify only; do not reject, kill, or score the idea
+      - Use at most {{max_rounds}} clarification rounds
+      - Ask the minimum sharp questions needed to remove ambiguity
+      - Focus on problem clarity, audience specificity, hypothesis strength,
+        and constraint completeness
+      - If an answer cannot be supported from the input, say `NOT STATED`
+
+      Because this recipe is non-interactive, simulate the clarification process by:
+      1. Listing the most important Socratic questions round by round
+      2. Providing a provisional answer for each question using either [STATED],
+         [INFERRED], or NOT STATED
+      3. Ending with an updated working interpretation of the idea
+      4. Explicitly listing unresolved unknowns that still need user confirmation
+
+      Return YAML only using this shape:
+      ```yaml
+      clarification:
+        rounds_used: "<number up to {{max_rounds}}>"
+        rounds:
+          - round: 1
+            focus: "problem clarity | audience specificity | hypothesis strength | constraint completeness"
+            question: "direct Socratic question"
+            provisional_answer: "[STATED] / [INFERRED] / NOT STATED ..."
+            why_it_matters: "why this question changes idea quality"
+        updated_interpretation:
+          problem: "..."
+          audience: "..."
+          hypothesis: "..."
+          constraints:
+            - "..."
+        unresolved_unknowns:
+          - "..."
+      ```
+    output: "socratic_clarification"
+    timeout: 180
+
+  # ==========================================================================
+  # STEP 3: STRUCTURED REFLECTION
+  # Produce the final IdeaCapture with stated facts vs inferences clearly marked
+  # ==========================================================================
+  - id: "structured-reflection"
+    agent: "amplihack:crucible-intake"
+    prompt: |
+      Produce the final structured IdeaCapture for Crucible Refine mode.
+
+      **Raw Idea:**
+      {{raw_idea}}
+
+      **Parsed Intake:**
+      {{parsed_intake}}
+
+      **Socratic Clarification:**
+      {{socratic_clarification}}
+
+      Requirements:
+      1. Produce a clean final IdeaCapture
+      2. Fill every field responsibly
+      3. Mark direct user statements as [STATED]
+      4. Mark conservative deductions as [INFERRED]
+      5. Use NOT STATED where responsible completion is impossible
+      6. Do not reject the idea or shift into adversarial evaluation
+
+      Return YAML only using your standard intake contract:
+      ```yaml
+      idea:
+        raw_input: "<preserved verbatim>"
+        problem: "<what problem does this solve?>"
+        audience: "<who has this problem?>"
+        hypothesis: "<why would this solution work?>"
+        existing_alternatives:
+          - "<what exists today>"
+        constraints:
+          - "<non-negotiable boundaries>"
+        goal_type: commercial | internal | research
+        suggested_mode: refine | scout | spar | commercial | internal | research
+        confidence: high | medium | low
+        reasoning: "<why this goal_type and mode>"
+      ```
+
+      After the YAML block, include a short `Notes:` section only if there are
+      still unresolved unknowns that require user confirmation.
+    output: "idea_capture"
+    timeout: 180
+
+  # ==========================================================================
+  # STEP 4: RUBBER DUCK REVIEW
+  # Independent critique of the final IdeaCapture framing quality
+  # ==========================================================================
+  - id: "rubber-duck-review"
+    agent: "amplihack:crucible-rubber-duck"
+    prompt: |
+      Review this final IdeaCapture as a cross-cutting critic.
+
+      **Phase:** IdeaCapture
+
+      **Content:**
+      {{idea_capture}}
+
+      **Prior Critiques:**
+      []
+
+      Focus on these failure modes first:
+      - assumptions hidden inside the framing
+      - leading questions or answer-presupposing language
+      - scope creep disguised as constraints
+      - solution masquerading as the problem
+
+      Crucible Refine has no kill authority.
+      Your role is to critique the framing quality, not to reject the idea.
+
+      Return YAML only using your standard rubber duck contract.
+    output: "rubber_duck_review"
+    timeout: 120
+
+  # ==========================================================================
+  # STEP 5: OUTPUT SUMMARY
+  # Present the refined idea and critique for user confirmation or revision
+  # ==========================================================================
+  - id: "output-summary"
+    agent: "amplihack:crucible-intake"
+    prompt: |
+      Assemble the final Crucible Refine summary.
+
+      **IdeaCapture:**
+      {{idea_capture}}
+
+      **Rubber Duck Review:**
+      {{rubber_duck_review}}
+
+      Include:
+      - workflow: crucible-refine
+      - version: 1.0.0
+      - status: complete
+      - purpose: clarified only; no kill authority exercised
+      - max_rounds_configured: {{max_rounds}}
+      - repo_path: {{repo_path}}
+      - final_idea_capture
+      - rubber_duck_review
+      - next_step: confirm or revise the IdeaCapture, then feed it into scout, spar, commercial, internal, or research mode.
+    output: "final_summary"
+    timeout: 60

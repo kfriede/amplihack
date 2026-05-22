@@ -1,0 +1,457 @@
+name: "crucible-internal"
+description: "Internal tool validation — adversarial debate with reluctant kill threshold for build-vs-buy decisions"
+version: "1.0.0"
+author: "Amplihack Team"
+tags: ["crucible", "internal", "validation", "build-vs-buy", "adversarial"]
+
+# CRUCIBLE_INTERNAL: Internal Tool Build-vs-Buy Validation
+#
+# Purpose:
+#   Full adversarial validation for internal tools where the bear carries the burden
+#   of proof. This mode is intentionally harder to kill than commercial validation.
+#
+# When to use:
+#   - "I need this tool, but should I build vs buy/adapt?"
+#   - Internal automation or workflow tools for your team or org
+#   - Platform or ops ideas where maintenance burden may outweigh the pain
+#   - Situations where scope reduction may beat a full build
+#
+# Phases (8 steps):
+#   1. Intake - Parse the idea and force goal_type=internal
+#   2. Research - Gather validation evidence for and against the tool
+#   3. Research Rubber Duck - Critique research quality and bias
+#   4. Debate - Adversarial build-vs-buy debate with internal kill gates
+#   5. Debate Rubber Duck - Critique debate quality and verdict rigor
+#   6. Spec - Create technical spec when verdict is PROCEED or SIMPLIFY
+#   7. Spec Rubber Duck - Critique hidden complexity and dependencies
+#   8. Assemble Output - Emit ProductBrief or KillReport for handoff
+
+recursion:
+  max_depth: 4
+  max_total_steps: 50
+
+context:
+  # ==========================================================================
+  # REQUIRED INPUTS
+  # ==========================================================================
+
+  # Natural-language description of the internal tool idea to validate
+  idea_description: ""
+
+  # Optional prior research from earlier Crucible modes (ScoutReport or SparReport)
+  prior_research: ""
+
+  # Working directory / repo root
+  repo_path: "."
+
+  # ==========================================================================
+  # INTERNAL STATE (populated during execution)
+  # ==========================================================================
+  idea_record: ""
+  research_findings: ""
+  research_review: ""
+  debate_result: ""
+  debate_review: ""
+  technical_spec: ""
+  spec_review: ""
+  assembled_output: ""
+
+steps:
+  # ==========================================================================
+  # STEP 1: INTAKE
+  # ==========================================================================
+  - id: "intake"
+    agent: "amplihack:crucible-intake"
+    prompt: |
+      Parse this internal tool idea into a structured Crucible intake record.
+
+      **Raw Idea:** {{idea_description}}
+      **Requested Mode:** internal
+      **repo_path:** {{repo_path}}
+
+      Your task:
+      1. Parse the idea into problem, audience, hypothesis, alternatives, and constraints
+      2. Force `goal_type` to `internal`
+      3. Set `suggested_mode` to `internal`
+      4. Keep uncertainty visible instead of polishing weak framing
+
+      Return JSON only:
+      ```json
+      {
+        "idea": {
+          "raw_input": "{{idea_description}}",
+          "problem": "What internal problem this tool solves",
+          "audience": "Who inside the org has this problem",
+          "hypothesis": "Why this tool could work",
+          "existing_alternatives": ["Current workflows, tools, or status quo"],
+          "constraints": ["Non-negotiable boundaries"],
+          "goal_type": "internal",
+          "suggested_mode": "internal",
+          "confidence": "high/medium/low",
+          "reasoning": "Why this is internal-mode validation"
+        },
+        "gaps": ["Missing details that weaken validation"]
+      }
+      ```
+    output: "idea_record"
+    parse_json: true
+    timeout: 120
+
+  # ==========================================================================
+  # STEP 2: RESEARCH
+  # ==========================================================================
+  - id: "research"
+    agent: "amplihack:crucible-researcher"
+    prompt: |
+      Run Crucible research in **validation mode** for this INTERNAL tool idea.
+
+      **Idea Record:** {{idea_record}}
+      **Prior Research (optional):** {{prior_research}}
+      **Mode:** internal
+      **repo_path:** {{repo_path}}
+
+      Focus on:
+      - Existing solutions (commercial + OSS + DIY + current manual workaround)
+      - Build cost estimate
+      - Maintenance burden over 12 months
+      - ROI versus adapting an existing alternative
+      - Migration effort if a better existing solution already exists
+
+      Be direct. Include negative evidence even if it is inconvenient.
+
+      Return JSON only:
+      ```json
+      {
+        "research_findings": {
+          "mode": "validation",
+          "goal_type": "internal",
+          "evidence_for": [
+            {"claim": "Why building could make sense", "source": "Where this comes from", "strength": "strong/moderate/weak"}
+          ],
+          "evidence_against": [
+            {"claim": "Why this idea may fail or should be bought/adapted", "source": "Where this comes from", "strength": "strong/moderate/weak"}
+          ],
+          "existing_solutions": [
+            {
+              "name": "Solution name",
+              "type": "commercial/oss/internal/diy/status_quo",
+              "fit": "high/medium/low",
+              "migration_effort": "<2hr / half-day / multi-day / unknown",
+              "notes": "Why it matters"
+            }
+          ],
+          "build_cost_estimate": {
+            "initial_effort": "Estimated build effort",
+            "ongoing_maintenance": "Expected maintenance burden",
+            "operational_cost": "Infrastructure or support cost"
+          },
+          "roi_vs_alternatives": {
+            "build_case": "Why building beats adapting, if it does",
+            "buy_or_adapt_case": "Why adapting may be cheaper or safer",
+            "problem_cost_estimate": "Cost of the current pain over 12 months"
+          },
+          "technical_feasibility": {
+            "complexity": "trivial/simple/moderate/complex/ambitious",
+            "hard_problems": ["Difficult technical or organizational issues"],
+            "stack_options": ["Viable implementation approaches"]
+          },
+          "gaps": ["What could not be researched and why"]
+        }
+      }
+      ```
+    output: "research_findings"
+    parse_json: true
+    timeout: 180
+
+  # ==========================================================================
+  # STEP 3: RESEARCH RUBBER DUCK
+  # ==========================================================================
+  - id: "research-rubber-duck"
+    agent: "amplihack:crucible-rubber-duck"
+    prompt: |
+      Critique this research output for bias, weak evidence, and missing alternatives.
+
+      **phase:** research
+      **content:** {{research_findings}}
+      **prior_critiques:** []
+
+      Focus especially on:
+      - confirmation bias
+      - missing existing solutions
+      - weak migration-effort comparisons
+      - confidence inflation relative to evidence quality
+
+      Return JSON only matching the rubber duck schema.
+    output: "research_review"
+    parse_json: true
+    timeout: 120
+
+  # ==========================================================================
+  # STEP 4: DEBATE
+  # ==========================================================================
+  - id: "debate"
+    agent: "amplihack:crucible-debate"
+    prompt: |
+      Run Crucible INTERNAL mode adversarial debate for this idea.
+
+      **Idea:** {{idea_record}}
+      **Research Findings:** {{research_findings.research_findings}}
+      **Research Critique:** {{research_review.rubber_duck_review}}
+      **Mode:** internal
+      **repo_path:** {{repo_path}}
+
+      Debate configuration:
+      - burden_of_proof: bear
+      - kill_threshold: convergent_failure
+      - verdicts: PROCEED, SIMPLIFY, KILL, PIVOT
+
+      Kill gates to evaluate explicitly:
+      1. Better existing solution with <2hr migration effort
+      2. Maintenance burden exceeds problem cost over 12 months
+      3. Convergent failure across 3+ dimensions
+
+      Internal-specific gut checks:
+      - Could you solve this with a shell script + cron?
+      - Will you maintain this in 6 months?
+      - Does this solve the problem or just look cool?
+
+      Rules:
+      - Bear carries the burden: Bear must PROVE the idea cannot work
+      - Single flaws do not kill by default; they should trigger SIMPLIFY when scope reduction preserves value
+      - The synthesis must take a position and render one clear verdict
+      - If the idea is killed, provide pivot candidates
+      - If the idea is simplified, specify what survives and what gets cut
+
+      Return JSON only:
+      ```json
+      {
+        "debate_result": {
+          "mode": "internal",
+          "burden_of_proof": "bear",
+          "kill_threshold": "convergent_failure",
+          "verdict": "PROCEED/SIMPLIFY/KILL/PIVOT",
+          "confidence": "high/medium/low",
+          "bull_summary": {
+            "strongest_argument": "Best case for building",
+            "evidence": ["Supportive evidence that survived challenge"],
+            "weakest_point": "Where bull was most vulnerable"
+          },
+          "bear_summary": {
+            "strongest_argument": "Best case against building",
+            "evidence": ["Evidence supporting bear"],
+            "weakest_point": "Where bear failed to prove too much"
+          },
+          "kill_gates_evaluated": [
+            {"gate": "Better existing solution with <2hr migration effort", "triggered": false, "reasoning": "Why or why not"},
+            {"gate": "Maintenance burden exceeds problem cost over 12 months", "triggered": false, "reasoning": "Why or why not"},
+            {"gate": "Convergent failure across 3+ dimensions", "triggered": false, "reasoning": "Why or why not"}
+          ],
+          "gut_checks": [
+            {"question": "Could you solve this with a shell script + cron?", "answer": "Yes/No/Partially", "reasoning": "Why"},
+            {"question": "Will you maintain this in 6 months?", "answer": "Yes/No/Unclear", "reasoning": "Why"},
+            {"question": "Does this solve the problem or just look cool?", "answer": "Problem/Cool/Unclear", "reasoning": "Why"}
+          ],
+          "synthesis": {
+            "surviving_arguments": ["Arguments that held up"],
+            "fatal_flaws": ["Flaws that remained fatal"],
+            "verdict_reasoning": "Why this verdict is correct"
+          },
+          "simplification": {
+            "keep": ["Core value that survives"],
+            "cut": ["Scope to remove"],
+            "reasoning": "Why reduced scope is the right move"
+          },
+          "pivot_candidates": [
+            {"description": "Alternative framing", "avoids_flaw": "Which flaw it avoids", "estimated_viability": "high/medium/low"}
+          ]
+        }
+      }
+      ```
+    output: "debate_result"
+    parse_json: true
+    timeout: 240
+
+  # ==========================================================================
+  # STEP 5: DEBATE RUBBER DUCK
+  # ==========================================================================
+  - id: "debate-rubber-duck"
+    agent: "amplihack:crucible-rubber-duck"
+    prompt: |
+      Critique this debate for strawmen, fake agreement, and balanced mush.
+
+      **phase:** debate
+      **content:** {{debate_result}}
+      **prior_critiques:** {{research_review.rubber_duck_review.critiques}}
+
+      Focus especially on:
+      - whether Bear actually met the burden of proof
+      - whether SIMPLIFY was used when appropriate instead of fake fatalism
+      - whether the verdict is explicit and justified
+
+      Return JSON only matching the rubber duck schema.
+    output: "debate_review"
+    parse_json: true
+    timeout: 120
+
+  # ==========================================================================
+  # STEP 6: SPEC (conditional: verdict == PROCEED or SIMPLIFY)
+  # ==========================================================================
+  - id: "spec"
+    condition: "debate_result.debate_result.verdict == 'PROCEED' or debate_result.debate_result.verdict == 'SIMPLIFY'"
+    agent: "amplihack:architect"
+    prompt: |
+      Generate the technical specification for this INTERNAL tool.
+
+      **Idea Record:** {{idea_record}}
+      **Research Findings:** {{research_findings.research_findings}}
+      **Debate Result:** {{debate_result.debate_result}}
+      **Debate Critique:** {{debate_review.rubber_duck_review}}
+      **repo_path:** {{repo_path}}
+
+      Requirements:
+      - Produce a practical spec for implementation handoff
+      - If the verdict is SIMPLIFY, the spec MUST reflect the reduced scope only
+      - Prefer the simplest architecture that survives the debate
+      - Make hidden dependencies and maintenance cost explicit
+
+      Return JSON only:
+      ```json
+      {
+        "technical_spec": {
+          "verdict_basis": "{{debate_result.debate_result.verdict}}",
+          "executive_summary": "Why this should be built in this form",
+          "architecture": "High-level architecture",
+          "stack": ["Chosen technologies or tools"],
+          "complexity_estimate": "trivial/simple/moderate/complex",
+          "risks": ["Key delivery or maintenance risks"],
+          "mvp_scope": ["What the MVP includes"],
+          "out_of_scope": ["What is explicitly excluded"],
+          "user_stories": [
+            "As an internal user, I can ... so that ..."
+          ],
+          "estimated_effort": "Engineering effort estimate",
+          "suggested_recipe": "amplihack recipe or workflow to use next",
+          "first_milestone": "First concrete implementation milestone",
+          "dependencies": ["External services, data, integrations, or org dependencies"]
+        }
+      }
+      ```
+    output: "technical_spec"
+    parse_json: true
+    timeout: 180
+
+  # ==========================================================================
+  # STEP 7: SPEC RUBBER DUCK
+  # ==========================================================================
+  - id: "spec-rubber-duck"
+    condition: "debate_result.debate_result.verdict == 'PROCEED' or debate_result.debate_result.verdict == 'SIMPLIFY'"
+    agent: "amplihack:crucible-rubber-duck"
+    prompt: |
+      Critique this technical spec for hidden complexity and unstated dependencies.
+
+      **phase:** spec
+      **content:** {{technical_spec}}
+      **prior_critiques:**
+      - research: {{research_review.rubber_duck_review.critiques}}
+      - debate: {{debate_review.rubber_duck_review.critiques}}
+
+      Focus especially on:
+      - hidden complexity hiding behind architecture language
+      - unstated dependencies and maintenance obligations
+      - whether the evidence trail actually supports the scoped MVP
+
+      Return JSON only matching the rubber duck schema.
+    output: "spec_review"
+    parse_json: true
+    timeout: 120
+
+  # ==========================================================================
+  # STEP 8: ASSEMBLE OUTPUT
+  # ==========================================================================
+  - id: "assemble-output"
+    agent: "amplihack:crucible-debate"
+    parse_json: true
+    prompt: |
+      Assemble the final Crucible Internal output as JSON only. Do not include markdown fences.
+
+      **Idea Record:**
+      {{idea_record}}
+
+      **Research Findings:**
+      {{research_findings}}
+
+      **Research Rubber Duck Review:**
+      {{research_review}}
+
+      **Debate Result:**
+      {{debate_result}}
+
+      **Debate Rubber Duck Review:**
+      {{debate_review}}
+
+      **Technical Spec (present only for PROCEED or SIMPLIFY):**
+      {{technical_spec}}
+
+      **Spec Rubber Duck Review (present only for PROCEED or SIMPLIFY):**
+      {{spec_review}}
+
+      If the debate verdict is PROCEED or SIMPLIFY, return a ProductBrief:
+      ```json
+      {
+        "workflow": "crucible-internal",
+        "version": "1.0.0",
+        "mode": "internal",
+        "verdict": "PROCEED | SIMPLIFY",
+        "output_type": "ProductBrief",
+        "product_brief": {
+          "executive_summary": {},
+          "tech_spec": {},
+          "user_stories": [],
+          "evidence_trail": {
+            "intake": {},
+            "research": {},
+            "research_review": {},
+            "debate": {},
+            "debate_review": {},
+            "spec": {},
+            "spec_review": {}
+          },
+          "handoff_metadata": {
+            "ready_for": "amplihack",
+            "suggested_recipe": "default-workflow",
+            "estimated_effort": "effort estimate",
+            "first_milestone": "first milestone"
+          }
+        }
+      }
+      ```
+
+      If the debate verdict is KILL or PIVOT, return a KillReport/PivotFlag:
+      ```json
+      {
+        "workflow": "crucible-internal",
+        "version": "1.0.0",
+        "mode": "internal",
+        "verdict": "KILL | PIVOT",
+        "next_mode": "pivot",
+        "output_type": "KillReport | PivotFlag",
+        "kill_report": {
+          "fatal_flaws": [],
+          "evidence": {
+            "intake": {},
+            "research": {},
+            "research_review": {},
+            "debate": {},
+            "debate_review": {}
+          },
+          "counterarguments_attempted": {
+            "bull_summary": {},
+            "bear_summary": {}
+          },
+          "pivot_candidates": [],
+          "pattern_tags": ["internal", "build-vs-buy", "adversarial"],
+          "lessons": "verdict reasoning"
+        }
+      }
+      ```
+    output: "assembled_output"

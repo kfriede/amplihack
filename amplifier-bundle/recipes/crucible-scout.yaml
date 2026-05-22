@@ -1,0 +1,288 @@
+name: "crucible-scout"
+description: "Landscape reconnaissance — maps competitors, communities, and technology trends without judgment"
+version: "1.0.0"
+author: "Amplihack Team"
+tags: ["crucible", "scout", "research", "landscape", "reconnaissance"]
+
+# CRUCIBLE SCOUT MODE
+#
+# Pure landscape reconnaissance. Map what exists, who's doing it, and what's changing.
+# No judgment, no kill authority, no go/no-go recommendation.
+#
+# WHEN TO USE:
+#   - "I want to understand the space before I commit to an approach."
+#   - Early landscape mapping before debate or validation
+#   - Gathering competitors, communities, and technology signals
+#
+# OUTPUT:
+#   Produces a ScoutReport that can enrich an IdeaCapture for downstream Crucible modes.
+
+recursion:
+  max_depth: 4
+  max_total_steps: 20
+
+context:
+  # ==========================================================================
+  # REQUIRED INPUTS
+  # ==========================================================================
+
+  # The idea or space to scout. Can be raw text or a structured IdeaCapture.
+  idea_description: ""
+
+  # ==========================================================================
+  # CONFIGURATION OPTIONS
+  # ==========================================================================
+
+  # Comma-separated focus areas for research coverage.
+  focus_areas: "competitors,communities,technology,trends"
+
+  # Working directory for agent execution.
+  repo_path: "."
+
+  # ==========================================================================
+  # INTERNAL STATE (populated during execution)
+  # ==========================================================================
+  intake_result: ""
+  landscape_report: ""
+  research_review: ""
+
+steps:
+  # ==========================================================================
+  # STEP 1: INTAKE PARSE
+  # Structure raw input into a normalized idea record. Pass through if already structured.
+  # ==========================================================================
+  - id: "intake-parse"
+    agent: "amplihack:crucible-intake"
+    working_dir: "{{repo_path}}"
+    prompt: |
+      Normalize this input for Crucible Scout Mode.
+
+      **Input:** {{idea_description}}
+      **Mode:** scout
+      **Purpose:** Pure landscape reconnaissance before committing to an approach.
+
+      Your task:
+      1. Detect whether the input is raw text or already a structured IdeaCapture.
+      2. If it is raw text, transform it into a structured idea record.
+      3. If it is already structured, preserve the structure and only normalize fields needed for downstream use.
+      4. Preserve ambiguity instead of inventing missing details.
+
+      Scout mode constraints:
+      - Facts only
+      - No validation verdicts
+      - No recommendations
+      - No hidden prioritization
+      - No kill authority
+
+      Recursion guard:
+      - Do not invoke additional workflows, nested orchestration, or sub-recipes.
+      - Work only within this session.
+
+      Return JSON only:
+
+      ```json
+      {
+        "idea": {
+          "raw_input": "original raw input or preserved structured payload",
+          "problem": "structured problem statement or NOT STATED",
+          "audience": "structured audience or NOT STATED",
+          "hypothesis": "structured hypothesis or NOT STATED",
+          "existing_alternatives": ["list"],
+          "constraints": ["list"],
+          "goal_type": "commercial|internal|research",
+          "suggested_mode": "scout",
+          "confidence": "high|medium|low",
+          "reasoning": "why this structure is appropriate"
+        },
+        "input_shape": "raw_text|idea_capture",
+        "normalization_action": "structured|passed_through",
+        "missing_information": ["important unknowns that affect scouting quality"]
+      }
+      ```
+    output: "intake_result"
+    parse_json: true
+    timeout: 120
+
+  # ==========================================================================
+  # STEP 2: LANDSCAPE RESEARCH
+  # Recon mode only: map existing solutions, adjacent spaces, communities, and trends.
+  # ==========================================================================
+  - id: "landscape-research"
+    agent: "amplihack:crucible-researcher"
+    working_dir: "{{repo_path}}"
+    prompt: |
+      **CRUCIBLE SCOUT MODE — RECON MODE ONLY**
+
+      You are operating in explicit RECON MODE.
+
+      **Structured Idea:** {{intake_result.idea}}
+      **Input Shape:** {{intake_result.input_shape}}
+      **Focus Areas:** {{focus_areas}}
+
+      Research objectives:
+      1. Map existing solutions already serving this space.
+      2. Identify notable gaps in those existing solutions when evidence exists.
+      3. Map adjacent spaces that may overlap or absorb demand.
+      4. Identify emerging trends and technology shifts changing the space.
+      5. Identify key communities where discussion is happening.
+      6. Capture open source activity and GitHub ecosystem signals.
+      7. Surface research gaps and uncertainty honestly.
+
+      Research requirements:
+      - Use web_fetch for current public web research.
+      - Use GitHub search and repository signals for open source activity.
+      - Prefer recent, source-linked evidence over generic background knowledge.
+      - Distinguish observed fact from inference.
+      - No recommendations.
+      - No prioritization disguised as judgment.
+      - No go/no-go language.
+      - No kill authority.
+
+      Recursion guard:
+      - Do not invoke additional workflows, nested orchestration, or sub-recipes.
+      - Stay inside this research step.
+
+      Return JSON only:
+
+      ```json
+      {
+        "scout_report": {
+          "existing_solutions": [
+            {
+              "name": "solution name",
+              "url": "https://example.com",
+              "what_it_does": "short description",
+              "user_sentiment": "what people appear to say",
+              "gaps": ["observed gaps"],
+              "evidence_type": "fact|inference"
+            }
+          ],
+          "adjacent_spaces": ["nearby spaces or substitute categories"],
+          "emerging_trends": ["what is changing now"],
+          "technology_shifts": ["capabilities or infrastructure shifts"],
+          "communities": [
+            {
+              "name": "community name",
+              "url": "https://example.com",
+              "why_it_matters": "where discussion happens",
+              "evidence_type": "fact|inference"
+            }
+          ],
+          "open_source_activity": [
+            {
+              "repo": "owner/name",
+              "url": "https://github.com/owner/name",
+              "activity_level": "active|moderate|stale",
+              "signal": "why it is relevant"
+            }
+          ],
+          "research_gaps": ["what could not be verified"],
+          "confidence_levels": {
+            "market_data": "high|medium|low|unavailable",
+            "technical_feasibility": "high|medium|low|unavailable",
+            "competitive_landscape": "high|medium|low|unavailable"
+          }
+        }
+      }
+      ```
+    output: "landscape_report"
+    parse_json: true
+    timeout: 300
+
+  # ==========================================================================
+  # STEP 3: RUBBER DUCK REVIEW
+  # Critique the research for bias, weak evidence, and obvious omissions.
+  # ==========================================================================
+  - id: "rubber-duck-review"
+    agent: "amplihack:crucible-rubber-duck"
+    working_dir: "{{repo_path}}"
+    prompt: |
+      Review this Crucible Scout research output.
+
+      **Phase:** landscape-research
+      **Content:** {{landscape_report}}
+      **Prior Critiques:** []
+
+      Check specifically for:
+      - confirmation bias
+      - single-source reliance
+      - missing obvious competitors
+      - over-confident assessments
+
+      Scout mode review constraints:
+      - Critique the evidence quality, omissions, and confidence handling.
+      - Do not turn this into a recommendation.
+      - Do not propose a go/no-go decision.
+      - Maintain the no-kill-authority boundary.
+
+      Recursion guard:
+      - Do not invoke additional workflows, nested orchestration, or sub-recipes.
+      - Stay within this review step.
+
+      Return JSON only:
+
+      ```json
+      {
+        "rubber_duck_review": {
+          "phase": "landscape-research",
+          "critiques": [
+            {
+              "severity": "critical|important|minor",
+              "issue": "what is wrong",
+              "evidence": "specific evidence from the content",
+              "question": "what needs reconsideration"
+            }
+          ],
+          "escalated": false,
+          "recommendation": "continue|revise|escalate_to_human",
+          "escalation_reason": "only include when escalated"
+        }
+      }
+      ```
+    output: "research_review"
+    parse_json: true
+    timeout: 120
+
+  # ==========================================================================
+  # STEP 4: OUTPUT SCOUT REPORT
+  # Assemble the final ScoutReport with explicit confidence levels.
+  # ==========================================================================
+  - id: "output-scout-report"
+    agent: "amplihack:crucible-researcher"
+    parse_json: true
+    prompt: |
+      Assemble the final Crucible Scout output as JSON only. Do not include markdown fences.
+
+      **Focus Areas:** {{focus_areas}}
+
+      **Idea Capture:**
+      {{intake_result.idea}}
+
+      **Landscape Report:**
+      {{landscape_report.scout_report}}
+
+      **Rubber Duck Review:**
+      {{research_review.rubber_duck_review}}
+
+      Use this JSON shape:
+      ```json
+      {
+        "workflow": "crucible-scout",
+        "version": "1.0.0",
+        "mode": "scout",
+        "status": "complete",
+        "purpose": "Landscape reconnaissance only",
+        "kill_authority": "none",
+        "focus_areas": "competitors,communities,technology,trends",
+        "idea_capture": {},
+        "scout_report": {},
+        "rubber_duck_review": {},
+        "confidence_levels": {
+          "market_data": "high | medium | low | unavailable",
+          "technical_feasibility": "high | medium | low | unavailable",
+          "competitive_landscape": "high | medium | low | unavailable"
+        },
+        "downstream_note": "ScoutReport can be attached to an IdeaCapture as enrichment for downstream Crucible modes."
+      }
+      ```
+    output: "final_result"

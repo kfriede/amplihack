@@ -1,0 +1,239 @@
+name: "crucible-research"
+description: "Curiosity-driven exploration — maps possibility space without build pressure"
+version: "1.0.0"
+author: "Amplihack Team"
+tags: ["crucible", "research", "exploration", "possibility-space"]
+
+# CRUCIBLE RESEARCH MODE
+#
+# Purpose:
+#   Explore what could exist without pressure to build, justify, or sell.
+#   This is curiosity-driven research focused on mapping the possibility space.
+#
+# When to use:
+#   - "I'm curious about this space. What could exist?"
+#   - "What is becoming possible here?"
+#   - "What adjacent innovations might matter?"
+#
+# Core rules:
+#   - Barely kills anything; only treat an approach as dead if it is provably impossible
+#   - No verdict/spec/brief phase split; this is exploration, not validation
+#   - Primary artifact is a ResearchBrief ranked by feasibility × novelty
+#   - Light debate is collaborative, not adversarial
+
+recursion:
+  max_depth: 4
+  max_total_steps: 24
+
+context:
+  # The idea, problem area, or frontier to explore
+  idea_description: ""
+
+  # Research depth: standard or deep
+  depth: "standard"
+
+  # Working directory for any repo-aware agents
+  repo_path: "."
+
+  # Internal state populated during execution
+  intake_record: ""
+  research_landscape: ""
+  research_brief: ""
+  review_notes: ""
+
+context_validation:
+  idea_description: "nonempty"
+  repo_path: "git_repo"
+
+steps:
+  # ==========================================================================
+  # STEP 1: INTAKE PARSE
+  # Structure the exploration topic and force goal_type to research.
+  # ==========================================================================
+  - id: "intake-parse"
+    agent: "amplihack:crucible-intake"
+    working_dir: "{{repo_path}}"
+    prompt: |
+      Structure this Crucible exploration topic for Research Mode.
+
+      **Raw idea / space to explore:** {{idea_description}}
+      **Depth:** {{depth}}
+
+      This recipe is **Crucible Research Mode**.
+      Set `goal_type` to `research`.
+      Suggested mode should be `research`.
+      Treat this as curiosity-driven exploration with no build pressure and no sales pressure.
+
+      Your task:
+      1. Parse the topic into a structured Crucible intake record.
+      2. Preserve the raw input exactly.
+      3. Surface missing context or fuzzy framing plainly.
+      4. Keep it concise and immediately usable for downstream research.
+
+      Return the standard Crucible intake YAML block.
+    output: "intake_record"
+    timeout: 120
+
+  # ==========================================================================
+  # STEP 2: DEEP RESEARCH
+  # Recon mode, but with extended scope across papers, repos, adjacent signals,
+  # emerging capabilities, and cross-domain connections.
+  # ==========================================================================
+  - id: "deep-research"
+    agent: "amplihack:crucible-researcher"
+    working_dir: "{{repo_path}}"
+    prompt: |
+      Run Crucible Research Mode in **Recon Mode with extended scope**.
+
+      **Exploration topic:**
+      {{intake_record}}
+
+      **Depth:** {{depth}}
+
+      This is not validation. This is not go/no-go. This is not business-case generation.
+      Explore the possibility space.
+
+      Research dimensions to cover:
+      - papers, labs, and academic signals
+      - commercial and open-source repos/products
+      - adjacent innovations
+      - emerging capabilities
+      - cross-domain connections
+      - enabling infrastructure or standards shifts
+      - speculative but technically plausible directions
+
+      Depth rules:
+      - `standard`: broad map with strongest signals
+      - `deep`: broader and deeper scan, including more speculative but still defensible connections
+
+      Constraints:
+      - No recommendations disguised as verdicts
+      - Separate observed facts from inference
+      - If tools are limited, say so explicitly
+      - "Hard" is not "impossible"
+
+      Return YAML only in this shape:
+      ```yaml
+      research_map:
+        current_solutions:
+          - name: "<solution or repo>"
+            url: "<url or N/A>"
+            type: product | open_source | paper | research_project | adjacent_signal
+            what_it_shows: "<why it matters>"
+            limitations: ["<where it falls short>"]
+        emerging_capabilities:
+          - capability: "<what is becoming possible>"
+            why_now: "<what changed>"
+            confidence: high | medium | low | unavailable
+        cross_domain_connections:
+          - source_domain: "<domain>"
+            transferable_idea: "<pattern or capability>"
+            relevance: "<how it could matter here>"
+        unexplored_angles:
+          - "<plausible angle worth examining>"
+        knowledge_gaps:
+          - gap: "<what is unknown>"
+            how_to_answer: "<paper search / prototype / interview / benchmark / etc>"
+        confidence_levels:
+          landscape: high | medium | low | unavailable
+          emerging_capabilities: high | medium | low | unavailable
+          cross_domain_connections: high | medium | low | unavailable
+      ```
+    output: "research_landscape"
+    timeout: 180
+
+  # ==========================================================================
+  # STEP 3: LIGHT DEBATE
+  # Collaborative exploration over the landscape. No verdicts, no burden of
+  # proof games, and no normal Crucible kill behavior beyond true impossibility.
+  # Produces the primary ResearchBrief artifact.
+  # ==========================================================================
+  - id: "light-debate"
+    agent: "amplihack:crucible-debate"
+    working_dir: "{{repo_path}}"
+    prompt: |
+      Run a LIGHT, COLLABORATIVE Crucible debate over the explored possibility space.
+
+      **Structured intake:**
+      {{intake_record}}
+
+      **Research landscape:**
+      {{research_landscape}}
+
+      This is RESEARCH MODE, not validation mode.
+      Reframe the task from "what survives?" to "what's interesting and plausible?"
+
+      Hard rules for this mode:
+      - Collaborative exploration, not adversarial kill-or-defend theater
+      - No PROCEED / SIMPLIFY / KILL / PIVOT verdicts
+      - No burden of proof games
+      - No spec / brief / verdict phases
+      - Barely kill anything; only mark an approach impossible if it clearly violates physics or fundamental constraints
+      - Evaluate candidate directions by **feasibility × novelty**
+      - Call out both near-term and farther-out possibilities
+
+      Your task:
+      1. Identify distinct approaches or directions that could exist in this space.
+      2. Rank them by feasibility × novelty.
+      3. Highlight cross-domain combinations that create new openings.
+      4. Identify the single most promising direction.
+      5. Suggest the next experiment to reduce uncertainty fastest.
+      6. Be honest about what is speculative.
+
+      Return YAML only in this shape:
+      ```yaml
+      ResearchBrief:
+        ranked_approaches:
+          - rank: 1
+            approach: "<direction>"
+            feasibility: high | medium | low
+            novelty: high | medium | low
+            score_rationale: "<why this ranking makes sense>"
+            signals:
+              - "<evidence or enabling signal>"
+            caveats:
+              - "<important uncertainty>"
+        cross_domain_connections:
+          - "<important cross-domain connection>"
+        knowledge_gaps:
+          - gap: "<unknown that matters>"
+            how_to_answer: "<how to resolve it>"
+        most_promising_direction:
+          name: "<top direction>"
+          why: "<why it stands out>"
+        suggested_next_experiment:
+          experiment: "<smallest useful experiment>"
+          success_signal: "<meaningful signal to watch for>"
+      ```
+    output: "research_brief"
+    timeout: 180
+
+  # ==========================================================================
+  # STEP 4: RUBBER DUCK REVIEW
+  # Independent critique layer for missed obvious work, over-optimism, and gaps.
+  # ==========================================================================
+  - id: "rubber-duck-review"
+    agent: "amplihack:crucible-rubber-duck"
+    working_dir: "{{repo_path}}"
+    prompt: |
+      Review this Crucible Research Mode output.
+
+      **Phase:** research-brief
+      **Content to review:**
+      {{research_brief}}
+
+      **Prior critiques:** []
+
+      Focus specifically on:
+      - completeness: did we miss obvious related work, adjacent spaces, or enabling shifts?
+      - over-optimism: are speculative approaches presented with more confidence than the evidence supports?
+      - knowledge gaps: are the real unknowns called out clearly enough?
+
+      Apply the general checklist too:
+      - internal consistency
+      - evidence quality
+      - completeness
+
+      Return the standard `rubber_duck_review` YAML only.
+    output: "review_notes"
+    timeout: 120
