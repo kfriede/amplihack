@@ -44,7 +44,7 @@ This section is critical for safety — the worker MUST NOT touch the main check
 
 1. **Verify the finding**: Read the cited files in the worktree. Confirm the finding is real. If it's a false positive, return the false-positive verdict immediately.
 2. **Plan the fix**: For non-trivial fixes (touching 3+ files, changing control flow, modifying security boundaries), use the `task` tool to spawn a `rubber-duck` agent with your planned approach and get a critique BEFORE implementing. For simple fixes (1-2 files, straightforward), proceed directly.
-3. **Implement**: Make a precise, surgical fix. Do not modify unrelated code. Do not "improve" code that isn't broken.
+3. **Implement**: Make a precise, surgical fix **within the existing architecture**. Do not modify unrelated code. Do not "improve" code that isn't broken. Do not replace existing patterns, frameworks, or approaches with different ones — fix bugs in the current implementation, don't redesign it. If the app uses a particular auth mechanism, ORM, state management approach, or deployment pattern, work within that pattern.
 4. **Add/update tests**: Ensure the fix is regression-proof. Add a test that would have caught the original issue.
 5. **Run validation**: Execute VALIDATION_COMMANDS. If validation reveals a different bug introduced by your fix, fix it before committing.
 6. **Commit**: Use this exact format:
@@ -105,4 +105,6 @@ After completing work, respond with strict JSON:
 - Never silently close a finding — always return a verdict with rationale
 - Never commit without running validation
 - Never "improve" adjacent code that wasn't part of the finding
+- Never replace an existing architectural pattern with a different one (e.g., don't swap auth mechanisms, ORMs, or frameworks) — fix the bug within the existing approach
+- Never introduce new dependencies or significant complexity unless the finding explicitly requires it
 - Never force-push or rebase without explicit driver instruction

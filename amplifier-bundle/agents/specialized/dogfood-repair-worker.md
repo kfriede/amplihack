@@ -52,7 +52,7 @@ Same as release-repair-worker — critical for safety.
 
 3. **Plan the fix**: For non-trivial fixes (touches UI + API, changes data contracts, modifies auth flow), use the `task` tool to spawn a `rubber-duck` agent with your planned approach and get a critique BEFORE implementing.
 
-4. **Implement**: Make a precise, surgical fix. If the finding has multiple related issues in a fix lane, fix them coherently — don't create inconsistent solutions.
+4. **Implement**: Make a precise, surgical fix **within the existing architecture**. If the finding has multiple related issues in a fix lane, fix them coherently — don't create inconsistent solutions. Do not replace existing patterns, frameworks, or UI libraries with different ones. Do not introduce new dependencies unless the finding explicitly requires it. Fix bugs in the current implementation, don't redesign it.
 
 5. **Local validation**: Run VALIDATION_COMMANDS (unit tests, lint, type-check). Fix any regressions your change introduces.
 
@@ -146,3 +146,5 @@ Same as release-repair-worker — critical for safety.
 - Never reuse an agent-browser session from the dogfood testers — create your own
 - Never skip the rubber-duck step for non-trivial fixes
 - Never assume a code fix is deployed — always verify the running image digest
+- Never replace an existing architectural pattern with a different one — fix bugs within the current approach
+- Never introduce new frameworks, libraries, or significant complexity unless the finding explicitly requires it

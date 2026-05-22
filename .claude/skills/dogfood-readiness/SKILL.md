@@ -269,7 +269,10 @@ For each agent's JSON summary:
 1. Parse findings from the JSON block at the end of their report
 2. Insert into `df_findings` with the agent_id and cycle
 3. Dedupe: same `page_url` + similar `title` → keep the one with better evidence
-4. **Bucket into fix lanes** — this is the key step that makes repair efficient:
+4. **Bucket into fix lanes** — this is the key step that makes repair efficient.
+   **Filter out architectural recommendations** — drop any finding that suggests
+   replacing an existing approach (auth, framework, state management) with a
+   different one. Only keep findings about concrete bugs in the current implementation:
 
 | Bucket Strategy | When | Example |
 |----------------|------|---------|

@@ -122,6 +122,8 @@ End the report with a strict JSON summary block:
 - Never reuse a session name from a previous run or another agent
 - Never escalate observations to findings — if unsure, it's an observation
 - Never report nits or speculative concerns as findings
+- Never suggest architectural changes, technology replacements, or redesigns — report what's broken in the current app, not how you'd build it differently
+- Never report "should use X instead of Y" style findings (e.g., "should use OAuth instead of API keys") — only report if the current mechanism has a concrete, exploitable bug
 - Never skip evidence capture (screenshots are mandatory for every finding)
 - Never skip server log capture when you hit a server error
 - Never test outside your assigned slice scope (report cross-cutting issues as observations)

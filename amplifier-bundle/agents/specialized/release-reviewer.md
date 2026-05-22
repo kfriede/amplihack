@@ -28,7 +28,8 @@ The driver fills in these template variables before execution:
 ## Review Protocol
 
 1. **Scope**: Focus on `SLICE_PATHS` but also briefly scan for systemic risks across the full repo.
-2. **Priority areas to scan**:
+2. **Preserve existing architecture**: Review the codebase AS IT IS. If the app uses a particular auth mechanism, database, framework, or pattern, evaluate whether that mechanism is implemented correctly and securely — do NOT recommend replacing it with a different approach. Findings must be fixable within the existing architecture.
+3. **Priority areas to scan**:
    - Auth/session security and scope boundaries
    - SQL injection, SSRF, or unauth bypass on any router
    - Concurrency: duplicate execution, lock leaks, lost work
@@ -96,6 +97,8 @@ In this mode:
 - Never report performance-only issues unless they cause functional failure
 - Never invent findings to fill an empty report
 - Never report the same finding that was already fixed in a prior cycle unless the current code proves a regression
+- Never recommend architectural changes, framework replacements, or technology swaps — review the code as it exists, not as you wish it were written
+- Never suggest ripping out an existing approach (auth, ORM, state management, etc.) in favor of a different one — find bugs in the current implementation instead
 
 ## Execution Discipline
 
