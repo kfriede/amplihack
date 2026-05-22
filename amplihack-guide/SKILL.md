@@ -33,6 +33,9 @@ uvx --from git+https://github.com/kfriede/amplihack amplihack copilot
 # Claude Code
 uvx --from git+https://github.com/kfriede/amplihack amplihack claude
 
+# Grok Build
+uvx --from git+https://github.com/kfriede/amplihack amplihack grok
+
 # Microsoft Amplifier
 uvx --from git+https://github.com/kfriede/amplihack amplihack amplifier
 ```

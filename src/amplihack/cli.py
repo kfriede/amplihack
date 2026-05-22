@@ -33,14 +33,14 @@ EMOJI = {
 }
 
 # Commands that require Claude Code plugin installation.
-# All other commands (copilot, amplifier, codex, etc.) skip it.
+# All other commands (copilot, amplifier, codex, grok, etc.) skip it.
 _CLAUDE_COMMANDS = {None, "launch", "claude", "RustyClawd"}
 
 # Commands that launch a subordinate CLI/SDK and can safely receive unknown
 # arguments as passthrough. This lets `amplihack copilot --resume` behave like
 # `amplihack copilot -- --resume` while keeping strict parsing for management
 # commands such as `install`, `plugin`, and `memory`.
-_PASSTHROUGH_COMMANDS = _CLAUDE_COMMANDS | {"copilot", "codex", "amplifier"}
+_PASSTHROUGH_COMMANDS = _CLAUDE_COMMANDS | {"copilot", "codex", "amplifier", "grok"}
 
 
 def _debug_print(message: str) -> None:
@@ -469,6 +469,7 @@ Auto Mode Examples:
   amplihack claude --auto --max-turns 20 -- -p "refactor the API module"
   amplihack copilot --auto -- -p "add logging to all services"
   amplihack codex --auto -- -p "optimize database queries"
+  amplihack grok --auto -- -p "build a notification system"
   amplihack amplifier --auto -- -p "build a REST API"
 
 Amplifier Examples:
@@ -537,6 +538,11 @@ For comprehensive auto mode documentation, see docs/AUTO_MODE.md""",
     codex_parser = subparsers.add_parser("codex", help="Launch OpenAI Codex CLI")
     add_auto_mode_args(codex_parser)
     add_common_sdk_args(codex_parser)
+
+    # Grok command
+    grok_parser = subparsers.add_parser("grok", help="Launch Grok Build CLI")
+    add_auto_mode_args(grok_parser)
+    add_common_sdk_args(grok_parser)
 
     # Amplifier command
     # Note: All amplifier-specific args (--model, --provider, --resume, etc.) should be
@@ -1009,7 +1015,7 @@ def _common_launcher_startup(args: "argparse.Namespace") -> None:
     """Run all shared startup initialization for launcher commands.
 
     Consolidates initialization that must happen for every launcher path
-    (launch, claude, RustyClawd, copilot, codex, amplifier). Respects
+    (launch, claude, RustyClawd, copilot, codex, grok, amplifier). Respects
     --subprocess-safe to avoid concurrent write races (#2567).
 
     Idempotent — safe to call multiple times (e.g. RustyClawd → launch_command).
@@ -1285,7 +1291,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Working directory remains: {original_cwd}")
 
         # Only install Claude Code plugin for Claude-specific commands.
-        # Non-Claude commands (copilot, amplifier, codex, etc.) skip this.
+        # Non-Claude commands (copilot, amplifier, codex, grok, etc.) skip this.
         if args.command in _CLAUDE_COMMANDS:
             # Setup plugin architecture
             # .claude-plugin is copied to src/amplihack/.claude-plugin/ by build_hooks.py
@@ -1613,6 +1619,32 @@ def main(argv: list[str] | None = None) -> int:
         # Normal codex launch
         has_prompt = claude_args and "-p" in claude_args
         return launch_codex(claude_args, interactive=not has_prompt)
+
+    elif args.command == "grok":
+        from .launcher.grok import launch_grok
+
+        # Handle append mode FIRST (before any other initialization)
+        if getattr(args, "append", None):
+            return handle_append_instruction(args)
+
+        # Set agent binary env var for recipe runner and sub-processes
+        os.environ["AMPLIHACK_AGENT_BINARY"] = "grok"
+
+        # Shared startup (nesting, staging, deps, power-steering)
+        _common_launcher_startup(args)
+
+        # Handle auto mode
+        exit_code = handle_auto_mode("grok", args, claude_args)
+        if exit_code is not None:
+            return exit_code
+
+        # Handle --no-reflection flag (disable always wins priority)
+        if getattr(args, "no_reflection", False):
+            os.environ["AMPLIHACK_SKIP_REFLECTION"] = "1"
+
+        # Normal grok launch
+        has_prompt = claude_args and "-p" in claude_args
+        return launch_grok(claude_args, interactive=not has_prompt)
 
     elif args.command == "amplifier":
         from .launcher.amplifier import launch_amplifier, launch_amplifier_auto
