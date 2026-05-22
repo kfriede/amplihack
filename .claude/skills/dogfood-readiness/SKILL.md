@@ -290,8 +290,14 @@ Expect 6-10× collapse: 142 raw findings → ~21 fix lanes is typical.
 
 #### 3d. Empty Cycle Check
 
-If `total_findings == 0` (no critical/high/medium):
+If no critical/high/medium findings remain after triage (low-only or zero):
 → Run confirmation cycle (Step 3g)
+
+**UX finding retention:** Do NOT drop medium-severity UX findings during
+triage. Dead buttons, state lies, empty states, misleading errors, and broken
+layouts are deployment-blocking if they affect primary user flows. Only drop
+mediums that are purely cosmetic (color, spacing, font). When in doubt, keep
+the finding — the repair worker can reject it as false-positive if warranted.
 
 If non-empty:
 → Continue to repair (Step 3e)

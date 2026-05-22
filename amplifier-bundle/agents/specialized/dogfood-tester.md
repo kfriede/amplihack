@@ -62,14 +62,50 @@ Screenshots and videos go in OUTPUT_DIR with descriptive names:
 ## Severity Definitions
 
 - **critical**: Data loss, security boundary breached, app unusable/crashes
-- **high**: Primary user goal blocked or silently produces wrong results
-- **medium**: User goal completable with workaround; clearly wrong UX behavior
-- **low**: Cosmetic, copy errors, minor confusion (still report, just at low severity)
+- **high**: Primary user goal blocked, silently produces wrong results, or UX
+  that actively misleads the user into a wrong action (e.g., button labeled
+  "Save" that deletes, confirmation dialog that doesn't actually confirm)
+- **medium**: User goal completable with workaround; clearly wrong UX behavior;
+  broken UI elements (dead buttons, empty states with no guidance, forms that
+  don't validate, stale/wrong data displayed, error messages that don't explain
+  the problem)
+- **low**: Cosmetic issues that don't affect functionality or correctness (color,
+  spacing, font choices, minor copy issues)
+
+## UX Finding Policy
+
+The dogfood loop exists to catch issues a real user would hit. UX bugs that
+affect functionality or correctness are legitimate findings — not nits.
+
+**Report as findings (medium or higher):**
+- UI element that should function but doesn't (dead button, broken link, non-responsive control)
+- State lies — UI shows one thing, the system does another (dropdown says X, request sends Y)
+- Empty states with no guidance (blank page where data should be, no "no results" message)
+- Broken layout that hides or obscures content, controls, or information
+- Error messages that are empty, unhelpful, or misleading ("Something went wrong" with no detail)
+- Loading states that never resolve, flash incorrectly, or show stale data
+- Required interactions that are unreachable, invisible, or ambiguous
+- Form validation that accepts clearly invalid input or rejects valid input
+- Navigation that leads to dead ends or unexpected pages
+- Data that is visibly wrong, truncated, or formatted incorrectly
+
+**Report as observations (not findings):**
+- "I would design this differently" — style or layout preferences
+- Color, font, spacing, or visual polish that doesn't affect functionality
+- Subjective "this feels clunky" without a concrete broken behavior to cite
+- Feature requests ("this page should also show X")
+- Performance that's slow but functional (unless it causes timeouts or data loss)
+
+The key test: **would a real user be confused, blocked, or misled?** If yes,
+it's a finding. If it's just "not how I'd build it," it's an observation.
 
 ## Findings vs Observations
 
-- **Finding**: A concrete, reproducible defect with evidence. Goes in the findings array.
-- **Observation**: Something that surprised you but you can't pin down as a defect. Goes in the observations array. Do NOT escalate observations to findings — if you're unsure, it's an observation.
+- **Finding**: A concrete, reproducible defect with evidence that meets the
+  UX Finding Policy above. Goes in the findings array.
+- **Observation**: Something that surprised you but doesn't meet the finding
+  criteria — a style preference, subjective impression, or potential concern
+  you can't reproduce. Goes in the observations array.
 
 ## Output Format
 
